@@ -5,21 +5,23 @@ from scipy.special import sph_harm
 
 '''
 To Do:
+- Render whole strain file
 - Compile all l, m, strain values given
-
+- Add functionality to customize output directory
 '''
 
 
 # File parameters
 folder_name = "gw_test"
-input_file = "/home/guest/Documents/BH_Vis/data/gw_data/Rpsi4_l2-r0100.0_strain.txt"
+input_file = "/home/guest/Documents/bh_vis/scripts/Rpsi4_l2-r0100.0_strain.txt"
 parent_directory = os.path.dirname(os.path.dirname(__file__))
 #output_directory = parent_directory + "/../../data/mesh/" + folder_name
-output_directory = "/home/guest/Documents/BH_Vis/data/mesh/gw_test/" #i know this is cheating
+output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test/" #i know this is cheating
 
 
 # Set up grid parameters
-status_messages = True 
+status_messages = True
+plot_strain = True
 l = 2
 m = 2
 num_points_x = 200
@@ -33,7 +35,6 @@ def set_sph_harm_array(l,m,s):
 
     # Store values in 2d array
     sph_harm_points = np.zeros((num_points_x,num_points_y),dtype=np.complex128) 
-
 
     for j in range(num_points_y):
         y = -(num_points_y - 1) + 2 * j
@@ -73,7 +74,6 @@ def initialize():
                 print("Exiting Program. Change output directory to an empty directory.")
                 exit()
     else:
-
         last_slash_index = output_directory.rfind("/")
         super_directory = output_directory[:last_slash_index] if last_slash_index != -1 else output_directory
         if os.path.exists(super_directory):
@@ -108,9 +108,19 @@ def initialize():
 # Assign values from initialize() function
 length, h_strain, sph_harm_points, h_time = initialize()
 
+# Plot the strain in 2d without spin-weighed spherical harmonics if wanted
+def show_strain_plot():
+    plt.plot(h_time, h_strain.real)
+    plt.title("Gravitational Wave Strain vs Time\nl =" + str(l) + "m =" + str(m) + "\nData Extraction Radius =" + str(R_ext) + "meters")
+    plt.xlabel("Time")
+    plt.ylabel("Real Part of Strain")
+
+    plt.show()
+if plot_strain:
+    show_strain_plot()
+
 start_time = time.time() #start timer
 percentage = np.round(np.linspace(0, length, 101)).astype(int) #creates an array of 10% points
-
 
 # Loop through all time values in the data
 state = 0 # For file naming purposes (***probably a better way to name them than this)
@@ -121,21 +131,22 @@ for current_time in h_time:
     grid = vtk.vtkStructuredGrid()
     grid.SetDimensions(num_points_x, num_points_y, num_points_z)
     
-    '''
+    # Output data generation progress to terminal - currently broken
+    t = np.where(h_time == current_time)[0][0]
     if status_messages and t == 10:
         end_time = time.time() #end timer 
         eta = (end_time - start_time) * length / 10
         print(f"Creating {length} meshes and saving them to {output_directory}.\nEstimated time: {eta}")
     if status_messages and t != 0 and np.isin(t,percentage):
         print(f" {int(t * 100 / (length - 1))}% done", end="\r") #create percentage status message ### THIS ISNT WORKING????
-    '''
-    # for every time value, set up x, y mesh points
+    
+    # For every time value, set up x, y mesh points
     for j in range(num_points_y):
         y = -(num_points_y - 1) + 2 * j
         for i in range(num_points_x):
             x = -(num_points_x - 1) + 2 * i
             current_r = np.sqrt(x**2 + y**2)
-            # Ror every point in the mesh, calculate the adjusted time to find the strain at based on radius, simulation time, and extraction radius
+            # For every point in the mesh, calculate the adjusted time to find the strain at based on radius, simulation time, and extraction radius
             target_time = current_time - current_r + R_ext
             
             # Find initial and final times in the data, constrain target_time within those values
