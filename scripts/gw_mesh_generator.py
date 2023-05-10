@@ -96,7 +96,6 @@ def initialize():
     # Separate time, real and imainary parts of h
     h_time, h_real, h_imag = strain_data[:, 0], strain_data[:, 1], strain_data[:, 2]
     h_strain = h_real + 1j*h_imag
-    
 
     length = len(h_strain)
 
