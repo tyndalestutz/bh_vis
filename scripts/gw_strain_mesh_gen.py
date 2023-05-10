@@ -21,7 +21,7 @@ num_points_y = 200
 num_points_z = 1
 R_ext = 100 # radius of data extraction we are taking the gw strain from
 
-# Most likely this will not be used
+# Most likely this will not be used.
 propogation_speed = 1 #how many pixels the gw travels in one delta t, i.e. (c/ units of time per second) * (pixels/meter)
 
 #note: maybe make amplitude part of the render script instead of this script?
