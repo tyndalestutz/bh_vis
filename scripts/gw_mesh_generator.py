@@ -89,7 +89,6 @@ def initialize():
     # Load the psi4 strain data into arrays - already precalculated
     with open(input_file, 'r') as f:
         strain_data = np.array([list(map(float, line.split())) for line in f if valid_line(line)])
-    
     # Sort by time and remove duplicates
     strain_data = np.unique(strain_data, axis=0)
 
