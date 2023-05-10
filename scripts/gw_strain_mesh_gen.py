@@ -28,7 +28,7 @@ propogation_speed = 1 #how many pixels the gw travels in one delta t, i.e. (c/ u
 amplitude = 100  # Set the amplitude of the wave visualization.
 
 #interpolated array allows for non-integer indecies and negative indecies return 0
-######## this is currently unused for most recent render
+######## this is currently unused for most recent render.
 class InterpolatedArray:
     def __init__(self, data):
         self.data = data
