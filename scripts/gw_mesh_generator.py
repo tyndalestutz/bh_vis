@@ -119,7 +119,7 @@ def show_strain_plot():
 if plot_strain:
     show_strain_plot()
 
-start_time = time.time() #start timer
+start_time = time.time() # Start timer
 percentage = np.round(np.linspace(0, length, 101)).astype(int) #creates an array of 10% points
 
 # Loop through all time values in the data
