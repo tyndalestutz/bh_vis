@@ -10,13 +10,18 @@ To Do:
 - Add functionality to customize output directory
 '''
 
+'''
+Temp Chamges:
+- Added scale factor
+- testing with higher res (more grid pts?)
+'''
 
 # File parameters
 folder_name = "gw_test"
 input_file = "/home/guest/Documents/bh_vis/scripts/Rpsi4_l2-r0100.0_strain.txt"
 parent_directory = os.path.dirname(os.path.dirname(__file__))
 #output_directory = parent_directory + "/../../data/mesh/" + folder_name
-output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test/" #i know this is cheating
+output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test2/" #i know this is cheating
 
 
 # Set up grid parameters
@@ -24,22 +29,32 @@ status_messages = True
 plot_strain = True
 l = 2
 m = 2
-num_points_x = 200
-num_points_y = 200
-num_points_z = 1
+x_lim = 200
+y_lim = 200
+z_lim = 1
+
+# currently the mesh plots properly only if resolution is twice as large as display_radius.
+# if the ratio (resolution/display_radius) < 2, will not display, if ratio > 2, will display a static rectangular mesh
+resolution = 300
+display_radius = 100
 R_ext = 100 # Radius of data extraction we are taking the gw strain from
 
 # Calculate spin-weighted spherical harmonics for every point in the mesh, returns them as complex values in a 2d array
 def set_sph_harm_array(l,m,s):
-    global num_points_x, num_points_y
+    global x_lim, y_lim, resolution, display_radius
 
     # Store values in 2d array
-    sph_harm_points = np.zeros((num_points_x,num_points_y),dtype=np.complex128) 
+    #sph_harm_points = np.zeros((x_lim,y_lim),dtype=np.complex128) 
+    sph_harm_points = np.zeros((resolution, resolution),dtype=np.complex128) 
 
-    for j in range(num_points_y):
-        y = -(num_points_y - 1) + 2 * j
-        for i in range(num_points_x):
-            x = -(num_points_x - 1) + 2 * i
+    interval = 2*display_radius/resolution
+    #for j in range(y_lim):
+    for j in range(resolution):
+        #y = -(y_lim - 1) + 2 * j
+        y = -(display_radius - 1) + (j*interval)
+        for i in range(resolution):
+            #x = -(x_lim - 1) + 2 * i
+            x = -(display_radius - 1) + (i*interval)
             r = np.sqrt(x**2 + y**2)
             theta = np.pi/2 # For 2d purposes, theta (polar angle) will be constant
             phi = np.arctan2(y, x)
@@ -72,7 +87,7 @@ def initialize():
                     os.remove(f"{output_directory}/{file}")
             else:
                 print("Exiting Program. Change output directory to an empty directory.")
-                exit()
+                exfile_nameit()
     else:
         last_slash_index = output_directory.rfind("/")
         super_directory = output_directory[:last_slash_index] if last_slash_index != -1 else output_directory
@@ -92,7 +107,7 @@ def initialize():
     # Sort by time and remove duplicates
     strain_data = np.unique(strain_data, axis=0)
 
-    # Separate time, real and imainary parts of h
+    # Separate time, real, and imainary parts of h
     h_time, h_real, h_imag = strain_data[:, 0], strain_data[:, 1], strain_data[:, 2]
     h_strain = h_real + 1j*h_imag
 
@@ -111,9 +126,9 @@ def show_strain_plot():
     plt.plot(h_time, h_strain.real)
     plt.title("Gravitational Wave Strain vs Time\nl =" + str(l) + "m =" + str(m) + "\nData Extraction Radius =" + str(R_ext) + "meters")
     plt.xlabel("Time")
-    plt.ylabel("Real Part of Strain")
+    plt.ylabel("Re Strain")
 
-    plt.show()
+    #plt.show()
 if plot_strain:
     show_strain_plot()
 
@@ -127,7 +142,8 @@ for current_time in h_time:
     # Create mesh
     points = vtk.vtkPoints()
     grid = vtk.vtkStructuredGrid()
-    grid.SetDimensions(num_points_x, num_points_y, num_points_z)
+    #grid.SetDimensions(x_lim, y_lim, z_lim)
+    grid.SetDimensions(resolution, resolution, z_lim)
     
     # Output data generation progress to terminal - currently broken
     t = np.where(h_time == current_time)[0][0]
@@ -138,11 +154,21 @@ for current_time in h_time:
     if status_messages and t != 0 and np.isin(t,percentage):
         print(f" {int(t * 100 / (length - 1))}% done", end="\r") #create percentage status message ### THIS ISNT WORKING????
     
-    # For every time value, set up x, y mesh points
-    for j in range(num_points_y):
-        y = -(num_points_y - 1) + 2 * j
-        for i in range(num_points_x):
-            x = -(num_points_x - 1) + 2 * i
+    # For every time value, set up x, y mesh poinfor j in range(y_lim):
+    interval = 2*display_radius/resolution
+    #for j in range(y_lim):
+    for j in range(resolution):
+        #y = -(y_lim - 1) + 2 * j
+        y = -(display_radius - 1) + (j*interval)
+        for i in range(resolution):
+            #x = -(x_lim - 1) + 2 * i
+            x = -(display_radius - 1) + (i*interval)
+    #for j in range(y_lim):
+        #y = -(y_lim - 1) + 2 * j
+        #for i in range(x_lim):
+            # Dramatize the strain amplitude
+            scale_factor = 4
+            #x = -(x_lim - 1) + 2 * i
             current_r = np.sqrt(x**2 + y**2)
             # For every point in the mesh, calculate the adjusted time to find the strain at based on radius, simulation time, and extraction radius
             target_time = current_time - current_r + R_ext
@@ -161,7 +187,7 @@ for current_time in h_time:
             Y = sph_harm_points[i, j]
 
             #Plot z based on the real part of the product of h_tR and Y
-            z = Y.real*h_tR.real - Y.imag*h_tR.imag
+            z = (Y.real*h_tR.real - Y.imag*h_tR.imag)*scale_factor
             points.InsertNextPoint(x, y, z*100)
             
     grid.SetPoints(points)
