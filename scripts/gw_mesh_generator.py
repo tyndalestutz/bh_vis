@@ -21,7 +21,7 @@ folder_name = "gw_test"
 input_file = "/home/guest/Documents/bh_vis/scripts/Rpsi4_l2-r0100.0_strain.txt"
 parent_directory = os.path.dirname(os.path.dirname(__file__))
 #output_directory = parent_directory + "/../../data/mesh/" + folder_name
-output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test2/" #i know this is cheating
+output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test3/" #i know this is cheating
 
 
 # Set up grid parameters
