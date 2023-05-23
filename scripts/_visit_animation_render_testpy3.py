@@ -10,32 +10,20 @@ parent_directory = os.path.dirname(os.path.dirname(__file__))
 # In order for the render to record, 'record_render' must be True
 record_render = False
 
-
 # object 0: Black hole 1
 # object 1: Black hole 2
 # bh1_x, bh2_x, etc are the values of the xyz coordinates of each black hole
 # L1_X, L2_x, etc are the xyz magnitudes of angular momentum (L) vectors 1 and 2.
 
-
-###File names
-
-#Note: fix this db path
-bh_database = "/home/guest/Documents/BH_Vis/data/mesh/spheres/iscos_sphere_sub8.obj"
-bh_data = "/home/guest/Documents/BH_Vis/data/synthetic_coords/synthetic_data_ang_momentum.csv"
-gw_database = "/home/guest/Documents/BH_Vis/data/mesh/synth_gw/test15/state*.vts database"
+# Note: fix this db path
+bh_database = "/home/guest/Documents/BH_Vis_local/data/mesh/spheres/iscos_sphere_sub8.obj"
+bh_data = "/home/guest/Documents/BH_Vis_local/data/synthetic_coords/synthetic_data_ang_momentum.csv"
+gw_database = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test4/state*.vts database"
 print(gw_database)
-'''
-#Background Image Citation: ESA/Hubble & NASA, https://www.nasa.gov/image-feature/goddard/2016/hubble-spots-an-irregular-island-in-a-sea-of-space
-background_image = parent_directory + "/data/background_images/blue_grid.png"
-frame_name = "synthetic_BH_test_animation"
-movie_output_destination = parent_directory + "/movies/movie2"
-'''
 
-###Parameters
+# Parameters
 green_screen = False
 show_axis_annotations = False
-
-
 
 def default_atts():
     a = v.AnnotationAttributes()
@@ -66,8 +54,6 @@ def default_atts():
         a.backgroundMode = a.Gradient  # Solid, Gradient, Image, ImageSphere
         a.imageRepeatX = 1
         a.imageRepeatY = 1
-
-    #this doesn't work for some reason
     v.SetAnnotationAttributes(a)
     
     View3DAtts = v.View3DAttributes()
@@ -105,41 +91,62 @@ def default_atts():
 
 def create_spheres():
     visit.OpenDatabase(bh_database)
-    #set attributes
-    PseudocolorAtts = v.PseudocolorAttributes()
-    PseudocolorAtts.minFlag = 1
-    PseudocolorAtts.min = -0.1
-    PseudocolorAtts.useBelowMinColor = 1
-    PseudocolorAtts.belowMinColor = (31, 31, 31, 255)
-    PseudocolorAtts.maxFlag = 1
-    PseudocolorAtts.max = 0.1
-    PseudocolorAtts.useAboveMaxColor = 1
-    PseudocolorAtts.aboveMaxColor = (0, 255, 0, 255)
+    v.PseudocolorAtts = v.PseudocolorAttributes()
+    v.PseudocolorAtts.minFlag = 1
+    v.PseudocolorAtts.min = -0.1
+    v.PseudocolorAtts.useBelowMinColor = 1
+    v.PseudocolorAtts.belowMinColor = (31, 31, 31, 255)
+    v.PseudocolorAtts.maxFlag = 1
+    v.PseudocolorAtts.max = 0.1
+    v.PseudocolorAtts.useAboveMaxColor = 1
+    v.PseudocolorAtts.aboveMaxColor = (0, 255, 0, 255)
+    v.AddPlot("Pseudocolor", "mesh_quality/warpage", 1, 1)
+    v.AddOperator("Transform")
+    v.SetPlotOptions(v.PseudocolorAtts)
+    v.AddPlot("Pseudocolor", "mesh_quality/warpage", 1, 1)
+    v.AddOperator("Transform")
+    v.SetPlotOptions(v.PseudocolorAtts)
 
-    v.AddPlot("Pseudocolor", "mesh_quality/warpage", 1, 1)
-    v.AddOperator("Transform")
-    v.SetPlotOptions(PseudocolorAtts)
-    v.AddPlot("Pseudocolor", "mesh_quality/warpage", 1, 1)
-    v.AddOperator("Transform")
-    v.SetPlotOptions(PseudocolorAtts)
+# Custom Color Table
+def MakeRGBColorTable(name, ct):
+    ccpl = v.ColorControlPointList()
+    for pt in ct:
+        p = v.ColorControlPoint()
+        p.colors = (pt[0] * 255, pt[1] * 255, pt[2] * 255, 255)
+        p.position = pt[3]
+        ccpl.AddControlPoints(p)
+    v.AddColorTable(name, ccpl)
+
+ct = ((1, 1, 0, 0.0), (0, 0, 1, 0.5), (1, 1, 0, 1))
+MakeRGBColorTable("custom_table1", ct)
 
 def create_gw():
     visit.OpenDatabase(gw_database)
-
-    #set attributes
+    v.AddPlot("Pseudocolor", "Strain", 1, 1)
     PseudocolorAtts = v.PseudocolorAttributes()
-    PseudocolorAtts.minFlag = 1
-    PseudocolorAtts.min = -0.1
-    PseudocolorAtts.useBelowMinColor = 1
-    PseudocolorAtts.belowMinColor = (31, 31, 31, 255)
+    PseudocolorAtts.scaling = PseudocolorAtts.Linear  # Linear, Log, Skew
+    PseudocolorAtts.limitsMode = PseudocolorAtts.OriginalData  # OriginalData, ActualData
+    PseudocolorAtts.min = -3
     PseudocolorAtts.maxFlag = 1
-    PseudocolorAtts.max = 0.1
-    PseudocolorAtts.useAboveMaxColor = 1
-    PseudocolorAtts.aboveMaxColor = (67, 91, 122, 255)
-
-    v.AddPlot("Mesh", "mesh", 1, 1)
-    v.AddPlot("Pseudocolor", "mesh_quality/degree", 1, 1)
+    PseudocolorAtts.max = 3
+    PseudocolorAtts.centering = PseudocolorAtts.Nodal  # Natural, Nodal, Zonal
+    PseudocolorAtts.colorTableName = "imola-seq" # imola-seq and viridis_light are nice
+    PseudocolorAtts.invertColorTable = 0
+    PseudocolorAtts.opacityType = PseudocolorAtts.FullyOpaque  # ColorTable, FullyOpaque, Constant, Ramp, VariableRange
+    PseudocolorAtts.pointType = PseudocolorAtts.Point  # Box, Axis, Icosahedron, Octahedron, Tetrahedron, SphereGeometry, Point, Sphere
+    PseudocolorAtts.pointSizeVarEnabled = 0
+    PseudocolorAtts.pointSizeVar = "default"
+    PseudocolorAtts.pointSizePixels = 2
+    PseudocolorAtts.lineType = PseudocolorAtts.Line  # Line, Tube, Ribbon
+    PseudocolorAtts.lineWidth = 0
+    PseudocolorAtts.renderSurfaces = 1
+    PseudocolorAtts.renderWireframe = 0
+    PseudocolorAtts.renderPoints = 0
+    PseudocolorAtts.smoothingLevel = 0
+    PseudocolorAtts.legendFlag = 1
+    PseudocolorAtts.lightingFlag = 1
     v.SetPlotOptions(PseudocolorAtts)
+    v.DrawPlots()
 
 def set_coords(objNum, x, y, z):
     v.SetActivePlots(objNum)
@@ -150,16 +157,13 @@ def set_coords(objNum, x, y, z):
     trasnformAtts.translateZ = z
     v.SetOperatorOptions(trasnformAtts, 0, 0)
 
-
 default_atts()
 create_spheres()
 create_gw()
 
+'''
 L1 = v.CreateAnnotationObject("Line3D")
 L2 = v.CreateAnnotationObject("Line3D")
-
-#to find annotation attributes
-#print(L1) 
 
 L1.useForegroundForLineColor = 0
 L1.color = (255, 255, 255, 255)
@@ -174,7 +178,7 @@ L2.width = 3
 L2.arrow2 = 1
 L2.arrow2Height = 0.2
 L2.arrow2Radius = 0.075
-
+'''
 
 with open(bh_data, 'r') as file:
     reader = csv.reader(file)
@@ -183,25 +187,24 @@ with open(bh_data, 'r') as file:
     for row in reader:
         # moves to the next gw vtk file
         v.TimeSliderNextState()
-        
         t = float(row[0])
         bh1_x = float(row[1])
         bh1_y = float(row[2])
         bh1_z = 2 #float(row[3])
-        L1_x = float(row[4])
-        L1_y = float(row[5])
-        L1_z = float(row[6])
+        #L1_x = float(row[4])
+        #L1_y = float(row[5])
+        #L1_z = float(row[6])
         bh2_x = float(row[7])
         bh2_y = float(row[8])
         bh2_z = 2 #float(row[9])
-        L2_x = float(row[10])
-        L2_y = float(row[11])
-        L2_z = float(row[12])
+        #L2_x = float(row[10])
+        #L2_y = float(row[11])
+        #L2_z = float(row[12])
         
-        L1.point1 = (bh1_x, bh1_y, bh1_z)
-        L1.point2 = (bh1_x + L1_x, bh1_y + L1_y, bh1_z + L1_z)
-        L2.point1 = (bh2_x, bh2_y, bh2_z)
-        L2.point2 = (bh2_x + L2_x, bh2_y + L2_y, bh2_z + L2_z)
+        #L1.point1 = (bh1_x, bh1_y, bh1_z)
+        #L1.point2 = (bh1_x + L1_x, bh1_y + L1_y, bh1_z + L1_z)
+        #L2.point1 = (bh2_x, bh2_y, bh2_z)
+        #L2.point2 = (bh2_x + L2_x, bh2_y + L2_y, bh2_z + L2_z)
         set_coords(0, bh1_x, bh1_y, bh1_z)
         set_coords(1, bh2_x, bh2_y, bh2_z)
         v.DrawPlots()
@@ -216,8 +219,7 @@ with open(bh_data, 'r') as file:
         # Save the window
         #v.SaveWindow()
 
-#frame_name_pattern = "synthetic_BH_test_animation_%04d.png"
-#movie_name = "streamline_crop_example.mp4"
+# frame_name_pattern = "synthetic_BH_test_animation_%04d.png"
+# movie_name = "streamline_crop_example.mp4"
 # The following command worked to create a movie from the file of pngs
-#ffmpeg -framerate 1000 -i synthetic_BH_test_animation%04d.png -vf "scale=770:-2" -c:v libx264 -r 1000 -pix_fmt yuv420p output.mp4
-
+# ffmpeg -framerate 1000 -i synthetic_BH_test_animation%04d.png -vf "scale=770:-2" -c:v libx264 -r 1000 -pix_fmt yuv420p output.mp4

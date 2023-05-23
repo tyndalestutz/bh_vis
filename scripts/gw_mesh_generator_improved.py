@@ -9,7 +9,7 @@ from scipy.special import sph_harm
 folder_name = "gw_test"
 input_file = "/home/guest/Documents/bh_vis/scripts/Rpsi4_l2-r0100.0_strain.txt"
 parent_directory = os.path.dirname(os.path.dirname(__file__))
-output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test4/"
+output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test5/"
 
 # Set up grid parameters
 status_messages = True
@@ -21,8 +21,8 @@ y_lim = 200
 z_lim = 1
 
 # Mesh parameters
-resolution = 200
-display_radius = 200
+resolution = 400
+display_radius = 300
 R_ext = 100
 
 # Calculate spin-weighted spherical harmonics for every point in the mesh, returns them as complex values in a 2d array
@@ -36,11 +36,11 @@ def set_sph_harm_array(l, m, s):
         y = -(display_radius - 1) + (j * interval)
         for i in range(resolution):
             x = -(display_radius - 1) + (i * interval)
-            r = np.sqrt(x**2 + y**2)
+            r = np.sqrt(x ** 2 + y ** 2)
             theta = np.pi / 2
             phi = np.arctan2(y, x)
             Y_lm = sph_harm(l, m, phi, theta)
-            Y = (-1)**s * np.sqrt((2*l+1)/(4*np.pi) * np.math.factorial(l-m)/np.math.factorial(l+m)) * Y_lm
+            Y = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * np.math.factorial(l - m) / np.math.factorial(l + m)) * Y_lm
             sph_harm_points[i, j] = Y
 
     return sph_harm_points
@@ -51,7 +51,7 @@ def interpolated_strain(target_time, source_time, data):
         raise ValueError("source_time and data must have the same number of rows")
     if not (np.diff(source_time) > 0).all():
         raise ValueError("source_time must be strictly increasing")
-    
+
     interpolated_data = np.interp(target_time, source_time, data)
     return interpolated_data
 
@@ -74,13 +74,13 @@ def initialize():
         else:
             print(f"Error: {super_directory} does not exist.")
             exit()
-        
+
     def valid_line(line):
         return not line.startswith("#")
-    
+
     with open(input_file, 'r') as f:
         strain_data = np.array([list(map(float, line.split())) for line in f if valid_line(line)])
-    
+
     strain_data = np.unique(strain_data, axis=0)
     h_time, h_real, h_imag = strain_data[:, 0], strain_data[:, 1], strain_data[:, 2]
     h_strain = h_real + 1j * h_imag
@@ -95,7 +95,8 @@ length, h_strain, sph_harm_points, h_time = initialize()
 
 def show_strain_plot():
     plt.plot(h_time, h_strain.real)
-    plt.title("Gravitational Wave Strain vs Time\nl =" + str(l) + "m =" + str(m) + "\nData Extraction Radius =" + str(R_ext) + "meters")
+    plt.title("Gravitational Wave Strain vs Time\nl =" + str(l) + "m =" + str(m) + "\nData Extraction Radius =" + str(
+        R_ext) + "meters")
     plt.xlabel("Time")
     plt.ylabel("Re Strain")
 
@@ -125,7 +126,7 @@ for current_time in h_time:
         y = -(display_radius - 1) + (j * interval)
         for i in range(resolution):
             x = -(display_radius - 1) + (i * interval)
-            current_r = np.sqrt(x**2 + y**2)
+            current_r = np.sqrt(x ** 2 + y ** 2)
             target_time = current_time - current_r + R_ext
             time_0 = np.min(h_time)
             time_f = np.max(h_time)
@@ -140,8 +141,38 @@ for current_time in h_time:
             scale_factor = 400
             z = (Y.real * h_tR.real - Y.imag * h_tR.imag) * scale_factor
             points.InsertNextPoint(x, y, z)
-                
+
     grid.SetPoints(points)
+
+    # Create strain data array
+    strain_array = vtk.vtkFloatArray()
+    strain_array.SetName("Strain")
+    strain_array.SetNumberOfComponents(1)
+    strain_array.SetNumberOfTuples(resolution * resolution)
+
+    # Populate strain data array
+    index = 0
+    for j in range(resolution):
+        for i in range(resolution):
+            x = -(display_radius - 1) + (i * interval)
+            y = -(display_radius - 1) + (j * interval)
+            current_r = np.sqrt(x ** 2 + y ** 2)
+            target_time = current_time - current_r + R_ext
+            time_0 = np.min(h_time)
+            time_f = np.max(h_time)
+            if target_time < time_0:
+                target_time = time_0
+            elif target_time > time_f:
+                target_time = time_f
+
+            h_tR = interpolated_strain(target_time, h_time, h_strain)
+            Y = sph_harm_points[i, j]
+
+            strain_value = (Y.real * h_tR.real - Y.imag * h_tR.imag) * scale_factor
+            strain_array.SetTuple1(index, strain_value)
+            index += 1
+
+    grid.GetPointData().AddArray(strain_array)
 
     writer = vtk.vtkXMLStructuredGridWriter()
     filename = output_directory + f"/state{state}.vts"
