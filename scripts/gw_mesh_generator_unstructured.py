@@ -9,13 +9,16 @@ from scipy.special import sph_harm
 folder_name = "gw_test"
 input_file = "/home/guest/Documents/bh_vis/scripts/Rpsi4_l2-r0100.0_strain.txt"
 parent_directory = os.path.dirname(os.path.dirname(__file__))
-output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test6_polar/"
+output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test8_polar_zeroR/"
 
 # Define the dimensions of the grid
-numTheta = 360  # Number of points along the theta direction
-numRadius = 200 # Number of points along the radius direction
-display_radius = 400 # Radius of mesh
-R_ext = 100
+numTheta = 180  # Number of points along the theta direction
+numRadius = 450 # Number of points along the radius direction
+new_numTheta = 720
+new_numRadius = 300
+change_time = 4150
+display_radius = 200 # Mesh radius
+R_ext = 100 # Extraction radius
 
 # Calculate spin-weight spherical harmonic
 def set_sph_harm_array(l, m, s, numTheta, numRadius, display_radius):
@@ -94,12 +97,14 @@ def initialize():
 length, h_strain, sph_harm_points, h_time = initialize()
 
 # Iterate over all points and construct mesh
-
 start_time = time.time()
 percentage = np.round(np.linspace(0, length, 101)).astype(int)
 state = 0
 scale_factor = 600
 status_messages = True
+omit_radius = 3
+
+# Main Loop
 for current_time in h_time:
     state += 1
     t = np.where(h_time == current_time)[0][0]
@@ -109,7 +114,13 @@ for current_time in h_time:
         print(f"Creating {length} meshes and saving them to {output_directory}.\nEstimated time: {eta}")
     if status_messages and t != 0 and np.isin(t, percentage):
         print(f" {int(t * 100 / (length - 1))}% done", end="\r")
-
+    '''
+    # Change resolution at the specified time
+    if current_time >= change_time:
+        numTheta = new_numTheta
+        numRadius = new_numRadius
+        sph_harm_points = set_sph_harm_array(2, 2, -2, numTheta, numRadius, display_radius)
+    '''
     # Create vtkUnstructuredGrid
     grid = vtk.vtkUnstructuredGrid()
 
@@ -128,7 +139,6 @@ for current_time in h_time:
             radius = display_radius * float(j) / float(numRadius - 1)  # Scaling radius from 0 to 1
             x = radius * math.cos(theta)
             y = radius * math.sin(theta)
-
             current_r = np.sqrt(x ** 2 + y ** 2)
             target_time = current_time - current_r + R_ext
             time_0 = np.min(h_time)
@@ -137,13 +147,14 @@ for current_time in h_time:
                 target_time = time_0
             elif target_time > time_f:
                 target_time = time_f
-
             h_tR = interpolated_strain(target_time, h_time, h_strain)
             Y = sph_harm_points[i, j]
             z = (Y.real * h_tR.real - Y.imag * h_tR.imag) * scale_factor
-            points.InsertNextPoint(x, y, z)
-
             strain_value = z
+            if current_r <= 4:
+                z = -10
+                strain_value = 0
+            points.InsertNextPoint(x, y, z)
             strain_array.SetTuple1(index, strain_value)
             index += 1
 

@@ -8,7 +8,7 @@ v = visit
 parent_directory = os.path.dirname(os.path.dirname(__file__))
 bh_database = "/home/guest/Documents/BH_Vis_local/data/mesh/spheres/iscos_sphere_sub8.obj"
 bh_data = "/home/guest/Documents/BH_Vis_local/data/synthetic_coords/synthetic_data_ang_momentum.csv"
-gw_database = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test4/state*.vts database"
+gw_database = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test5/state*.vts database"
 
 def EvalCubicSpline(t, allX, allY):
     n = len(allY)
@@ -232,7 +232,7 @@ def fly():
     # of control points. In this case, the control points are View3DAttributes
     # objects that we are using to animate the camera but they can be any object
     # that supports +, * operators.
-    nsteps = 640
+    nsteps = 550
     for i in range(nsteps):
         t = float(i) / float(nsteps - 1)
         c = EvalCubicSpline(t, x, cpts)
