@@ -8,7 +8,7 @@ v = visit
 parent_directory = os.path.dirname(os.path.dirname(__file__))
 bh_database = "/home/guest/Documents/BH_Vis_local/data/mesh/spheres/iscos_sphere_sub8.obj"
 bh_data = "/home/guest/Documents/BH_Vis_local/data/synthetic_coords/synthetic_data_ang_momentum.csv"
-gw_database = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test5/state*.vts database"
+gw_database = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test8_polar_zeroR_r=200/state*.vtu database"
 
 def EvalCubicSpline(t, allX, allY):
     n = len(allY)
@@ -44,11 +44,11 @@ def fly():
     #pca.skewFactor = 1
     pca.limitsMode = pca.OriginalData  # OriginalData, ActualData
     #pca.minFlag = 1
-    pca.min = -6
+    pca.min = -10
     pca.maxFlag = 1
-    pca.max = 6
+    pca.max = 10
     pca.centering = pca.Nodal  # Natural, Nodal, Zonal
-    pca.colorTableName = "imola-seq" # imola-seq and viridis_light are nice
+    pca.colorTableName = "viridis_light" # imola-seq and viridis_light are nice
     pca.invertColorTable = 0
     pca.opacityType = pca.FullyOpaque  
     pca.pointType = pca.Point  # Box, Axis, Icosahedron, Octahedron, Tetrahedron, SphereGeometry, Point, Sphere
@@ -84,6 +84,7 @@ def fly():
     v.SetAnnotationAttributes(a)
  
     # Create the control points for the views.
+    '''
     c0 = v.View3DAttributes()
     c0.viewNormal = (0, 0, 1)
     c0.focus = (0.5, 0.5, 0)
@@ -218,11 +219,125 @@ def fly():
     c6.axis3DScales = (1, 1, 1)
     c6.shear = (0, 0, 1)
     c6.windowValid = 1
+    '''
 
+    c0 = v.View3DAttributes()
+    c0.viewNormal = (0, 0, 1)
+    c0.focus = (0, 0, -4.12473)
+    c0.viewUp = (0, 1, 0)
+    c0.viewAngle = 30
+    c0.parallelScale = 282.904
+    c0.nearPlane = -565.807
+    c0.farPlane = 565.807
+    c0.imagePan = (0, 0)
+    c0.imageZoom = 2.59374
+    c0.perspective = 1
+    c0.eyeAngle = 2
+    c0.centerOfRotationSet = 0
+    c0.centerOfRotation = (0, 0, -4.12473)
+    c0.axis3DScaleFlag = 0
+    c0.axis3DScales = (1, 1, 1)
+    c0.shear = (0, 0, 1)
+    c0.windowValid = 1
+
+    c1 = v.View3DAttributes()
+    c1.viewNormal = (0.480004, -0.49164, 0.726558)
+    c1.focus = (0, 0, -4.12473)
+    c1.viewUp = (-0.532772, 0.494613, 0.686668)
+    c1.viewAngle = 30
+    c1.parallelScale = 282.904
+    c1.nearPlane = -565.807
+    c1.farPlane = 565.807
+    c1.imagePan = (0, 0)
+    c1.imageZoom = 3.13843
+    c1.perspective = 1
+    c1.eyeAngle = 2
+    c1.centerOfRotationSet = 0
+    c1.centerOfRotation = (0, 0, -4.12473)
+    c1.axis3DScaleFlag = 0
+    c1.axis3DScales = (1, 1, 1)
+    c1.shear = (0, 0, 1)
+    c1.windowValid = 1
+
+    c2 = v.View3DAttributes()
+    c2.viewNormal = (0.792583, -0.118684, 0.598102)
+    c2.focus = (0, 0, -4.12473)
+    c2.viewUp = (-0.595443, 0.0606849, 0.801102)
+    c2.viewAngle = 30
+    c2.parallelScale = 282.904
+    c2.nearPlane = -565.807
+    c2.farPlane = 565.807
+    c2.imagePan = (0, 0)
+    c2.imageZoom = 3.7975
+    c2.perspective = 1
+    c2.eyeAngle = 2
+    c2.centerOfRotationSet = 0
+    c2.centerOfRotation = (0, 0, -4.12473)
+    c2.axis3DScaleFlag = 0
+    c2.axis3DScales = (1, 1, 1)
+    c2.shear = (0, 0, 1)
+    c2.windowValid = 1
+
+    c3 = v.View3DAttributes()
+    c3.viewNormal = (0.82836, 0.17747, 0.531342)
+    c3.focus = (0, 0, -4.12473)
+    c3.viewUp = (-0.513939, -0.136656, 0.846872)
+    c3.viewAngle = 30
+    c3.parallelScale = 282.904
+    c3.nearPlane = -565.807
+    c3.farPlane = 565.807
+    c3.imagePan = (0, 0)
+    c3.imageZoom = 4.59497
+    c3.perspective = 1
+    c3.eyeAngle = 2
+    c3.centerOfRotationSet = 0
+    c3.centerOfRotation = (0, 0, -4.12473)
+    c3.axis3DScaleFlag = 0
+    c3.axis3DScales = (1, 1, 1)
+    c3.shear = (0, 0, 1)
+    c3.windowValid = 1
+
+    c4 = v.View3DAttributes()
+    c4.viewNormal = (0.474281, 0.56115, 0.678358)
+    c4.focus = (0, 0, -4.12473)
+    c4.viewUp = (-0.410203, -0.540923, 0.734259)
+    c4.viewAngle = 30
+    c4.parallelScale = 282.904
+    c4.nearPlane = -565.807
+    c4.farPlane = 565.807
+    c4.imagePan = (0, 0)
+    c4.imageZoom = 3.7975
+    c4.perspective = 1
+    c4.eyeAngle = 2
+    c4.centerOfRotationSet = 0
+    c4.centerOfRotation = (0, 0, -4.12473)
+    c4.axis3DScaleFlag = 0
+    c4.axis3DScales = (1, 1, 1)
+    c4.shear = (0, 0, 1)
+    c4.windowValid = 1
+
+    c5 = v.View3DAttributes()
+    c5.viewNormal = (0.474281, 0.56115, 0.678358)
+    c5.focus = (0, 0, -4.12473)
+    c5.viewUp = (-0.410203, -0.540923, 0.734259)
+    c5.viewAngle = 30
+    c5.parallelScale = 282.904
+    c5.nearPlane = -565.807
+    c5.farPlane = 565.807
+    c5.imagePan = (0, 0)
+    c5.imageZoom = 3.7975
+    c5.perspective = 1
+    c5.eyeAngle = 2
+    c5.centerOfRotationSet = 0
+    c5.centerOfRotation = (0, 0, -4.12473)
+    c5.axis3DScaleFlag = 0
+    c5.axis3DScales = (1, 1, 1)
+    c5.shear = (0, 0, 1)
+    c5.windowValid = 1
 
     # Create a tuple of camera values and x values. The x values are weights
     # that help to determine where in [0,1] the control points occur.
-    cpts = (c0, c1, c2, c3, c4, c5, c6)
+    cpts = (c0, c1, c2, c3, c4, c5)
     x=[]
     for i in range(7): # Personal Note: change this if you have more than 7 control points
         x = x + [float(i) / float(6.)]
@@ -232,7 +347,7 @@ def fly():
     # of control points. In this case, the control points are View3DAttributes
     # objects that we are using to animate the camera but they can be any object
     # that supports +, * operators.
-    nsteps = 550
+    nsteps = 650
     for i in range(nsteps):
         t = float(i) / float(nsteps - 1)
         c = EvalCubicSpline(t, x, cpts)
@@ -252,7 +367,7 @@ def fly():
         s.screenCapture = 1
         v.SetSaveWindowAttributes(s)
         # Save the window
-        #v.SaveWindow()
+        v.SaveWindow()
         # For moviemaking...
         # SaveWindow()
  

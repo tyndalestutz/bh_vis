@@ -17,8 +17,8 @@ record_render = False
 
 # Note: fix this db path
 bh_database = "/home/guest/Documents/BH_Vis_local/data/mesh/spheres/iscos_sphere_sub8.obj"
-bh_data = "/home/guest/Documents/BH_Vis_local/data/synthetic_coords/synthetic_data_ang_momentum.csv"
-gw_database = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test4/state*.vts database"
+bh_data = "/home/guest/Documents/BH_Vis_local/data/synthetic_coords/synthetic_data_test_GW.csv"
+gw_database = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test8_polar_zeroR_r=300/state*.vtu database"
 print(gw_database)
 
 # Parameters
@@ -126,11 +126,11 @@ def create_gw():
     PseudocolorAtts = v.PseudocolorAttributes()
     PseudocolorAtts.scaling = PseudocolorAtts.Linear  # Linear, Log, Skew
     PseudocolorAtts.limitsMode = PseudocolorAtts.OriginalData  # OriginalData, ActualData
-    PseudocolorAtts.min = -3
+    PseudocolorAtts.min = -10
     PseudocolorAtts.maxFlag = 1
-    PseudocolorAtts.max = 3
+    PseudocolorAtts.max = 10
     PseudocolorAtts.centering = PseudocolorAtts.Nodal  # Natural, Nodal, Zonal
-    PseudocolorAtts.colorTableName = "imola-seq" # imola-seq and viridis_light are nice
+    PseudocolorAtts.colorTableName = "viridis_light" # imola-seq and viridis_light are nice
     PseudocolorAtts.invertColorTable = 0
     PseudocolorAtts.opacityType = PseudocolorAtts.FullyOpaque  # ColorTable, FullyOpaque, Constant, Ramp, VariableRange
     PseudocolorAtts.pointType = PseudocolorAtts.Point  # Box, Axis, Icosahedron, Octahedron, Tetrahedron, SphereGeometry, Point, Sphere
@@ -159,7 +159,7 @@ def set_coords(objNum, x, y, z):
 
 default_atts()
 create_spheres()
-create_gw()
+#create_gw()
 
 '''
 L1 = v.CreateAnnotationObject("Line3D")
