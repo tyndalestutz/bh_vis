@@ -1,60 +1,68 @@
-
 import os
+import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 
 # File parameters
-folder_name = "gw_test"
-input_file = "/home/guest/Documents/bh_vis/scripts/Rpsi4_l2-r0100.0_strain.txt"
+folder_name = "sum_test"
 parent_directory = os.path.dirname(os.path.dirname(__file__))
-output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test10_polar_zeroR_r=300/"
+output_directory = "/home/guest/Documents/Users/Tyndale/bh_repos/bhah_waveform_analysis/r0100.0/many_modes/"
 
-# Reads inputted strain data - returns data file row length, initial strain data (complex), spin-weighted spherical harmonics (complex), and time values
-def initialize():
-    if os.path.exists(output_directory):
-        if len(os.listdir(output_directory)) != 0:
-            answer = input(f"Data already exists at {output_directory}. Overwrite it? You cannot undo this action. (Y/N) ")
-            if answer.capitalize() == "Y":
-                for file in os.listdir(output_directory):
-                    os.remove(f"{output_directory}/{file}")
-            else:
-                print("Exiting Program. Change output directory to an empty directory.")
-                exit()
-    else:
-        last_slash_index = output_directory.rfind("/")
-        super_directory = output_directory[:last_slash_index] if last_slash_index != -1 else output_directory
-        if os.path.exists(super_directory):
-            os.makedirs(output_directory)
-        else:
-            print(f"Error: {super_directory} does not exist.")
-            exit()
+# Get a list of all files that begin with "Rpsi4"
+input_files = glob.glob("/home/guest/Documents/Users/Tyndale/bh_repos/bhah_waveform_analysis/r0100.0/many_modes/Rpsi4*")
 
-    def valid_line(line):
-        return not line.startswith("#")
+def valid_line(line):
+    return not line.startswith("#")
 
-    with open(input_file, 'r') as f:
-        strain_data = np.array([list(map(float, line.split())) for line in f if valid_line(line)])
+def load_data(file_name):
+    with open(file_name, 'r') as f:
+        valid_lines = [line for line in f if valid_line(line)]
+        data = [list(map(float, line.split())) for line in valid_lines]
 
-    strain_data = np.unique(strain_data, axis=0)
-    h_time, h_real, h_imag = strain_data[:, 0], strain_data[:, 1], strain_data[:, 2]
-    h_strain = h_real + 1j * h_imag
+    # Determine expected number of columns based on the first row
+    num_columns = len(data[0])
 
-    length = len(h_strain)
+    # Filter out rows with a different number of columns
+    data = [row for row in data if len(row) == num_columns]
 
-    return length, h_strain, h_time
+    data = np.array(data)
+    data = np.unique(data, axis=0)
 
-length, h_strain, h_time = initialize()
+    return data
 
-######################
+# Load data from all files
+data = [load_data(input_file) for input_file in input_files]
 
-fig, ax = plt.subplots(figsize=(772/80, 80/80))
+# Check that all time series match
+#for i in range(len(data) - 1):
+    #assert np.array_equal(data[i][0], data[i+1][0]), "Time series do not match"
 
+# Sum up strain data
+h_time = data[0][:, 0]
+#h_strain = sum(item[:, 2] for item in data)
+h_strain = data[3][:, 1]
 strain_magnitude = np.real(h_strain)
 
+###
+
+# Create the plot
+fig, ax = plt.subplots()
+
+# Plot the data
+ax.plot(h_time, strain_magnitude)
+
+# Set titles for the axes
+ax.set_xlabel('Time')
+ax.set_ylabel('Strain')
+
+###
+
+'''
 # plot the entire line initially
-line, = ax.plot(h_time, strain_magnitude, color='lightgrey')
+line, = ax.plot(h_time, strain_magnitude, color='lightgray')
 ani_line, = ax.plot([], [], color='blue')
+fig, ax = plt.subplots(figsize=(772/80, 80/80))
 
 # Turn off axes
 ax.axis('off')
@@ -77,9 +85,8 @@ def update(i):
 ani = FuncAnimation(fig, update, frames=range(1, len(h_time)), blit=True)
 
 # Save the animation
-Writer = writers['ffmpeg']
-writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
-ani.save('animation.mp4', writer=writer)
-
+#Writer = writers['ffmpeg']
+#writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
+#ani.save('animation.mp4', writer=writer)
+'''
 plt.show()
-##########################

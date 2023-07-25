@@ -17,8 +17,8 @@ record_render = False
 
 # Note: fix this db path
 bh_database = "/home/guest/Documents/BH_Vis_local/data/mesh/spheres/iscos_sphere_sub8.obj"
-bh_data = "/home/guest/Documents/BH_Vis_local/data/synthetic_coords/synthetic_data_test_GW.csv"
-gw_database = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test8_polar_zeroR_r=300/state*.vtu database"
+bh_data = "/home/guest/Documents/bh_vis/scripts/sorted.csv"
+gw_database = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test8_polar_zeroR_r=200/state*.vtu database"
 print(gw_database)
 
 # Parameters
@@ -106,7 +106,7 @@ def create_spheres():
     v.AddPlot("Pseudocolor", "mesh_quality/warpage", 1, 1)
     v.AddOperator("Transform")
     v.SetPlotOptions(v.PseudocolorAtts)
-
+'''
 # Custom Color Table
 def MakeRGBColorTable(name, ct):
     ccpl = v.ColorControlPointList()
@@ -119,6 +119,7 @@ def MakeRGBColorTable(name, ct):
 
 ct = ((1, 1, 0, 0.0), (0, 0, 1, 0.5), (1, 1, 0, 1))
 MakeRGBColorTable("custom_table1", ct)
+'''
 
 def create_gw():
     visit.OpenDatabase(gw_database)
@@ -159,7 +160,7 @@ def set_coords(objNum, x, y, z):
 
 default_atts()
 create_spheres()
-#create_gw()
+create_gw()
 
 '''
 L1 = v.CreateAnnotationObject("Line3D")
@@ -189,13 +190,13 @@ with open(bh_data, 'r') as file:
         v.TimeSliderNextState()
         t = float(row[0])
         bh1_x = float(row[1])
-        bh1_y = float(row[2])
+        bh1_y = float(row[3])
         bh1_z = 2 #float(row[3])
         #L1_x = float(row[4])
         #L1_y = float(row[5])
         #L1_z = float(row[6])
-        bh2_x = float(row[7])
-        bh2_y = float(row[8])
+        bh2_x = float(row[2])
+        bh2_y = float(row[4])
         bh2_z = 2 #float(row[9])
         #L2_x = float(row[10])
         #L2_y = float(row[11])
@@ -209,7 +210,7 @@ with open(bh_data, 'r') as file:
         set_coords(1, bh2_x, bh2_y, bh2_z)
         v.DrawPlots()
         s = v.SaveWindowAttributes()
-        s.fileName = "synthetic_BH_test_animation"
+        s.fileName = "BH_test_animation"
         s.format = s.PNG
         s.progressive = 1
         s.width = 772

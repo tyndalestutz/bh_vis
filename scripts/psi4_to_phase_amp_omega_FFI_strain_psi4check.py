@@ -1,4 +1,7 @@
+# Author: Zach Etienne
+
 import numpy as np
+import os
 import re
 from scipy.optimize import curve_fit
 
@@ -195,87 +198,69 @@ def perform_complex_fft(time, real, imag):
 
     return frequencies, fft_data
 
-    
 def main():
     """
     Main function that reads the gravitational wave data file, processes the data,
     and saves the output to a file. The input filename is provided via command line.
     """
-    if len(sys.argv) != 2:
-        print("Usage: python3 phase_amp_omega.py <gravitational_wave_data.asc or .txt>")
+    if len(sys.argv) != 4:
+        print("Usage: python3 phase_amp_omega.py <gravitational_wave_data directory> <l value>")
         sys.exit(1)
 
-    file_name = sys.argv[1]
+    #directory = sys.argv[1]
+    input_file = sys.argv[1]
+    output_directory = sys.argv[2]
+    l_value = int(sys.argv[3])
 
-    if not file_name.endswith('.asc') and not file_name.endswith('.txt'):
-        print("Error: Input file must have a '.asc' or '.txt' extension.")
-        sys.exit(1)
 
-    time, mode_data = read_psi4(file_name)
-    real, imag = mode_data[(2, 2)]
-    print(real, imag)
+    # Loop over each m value
+    for m in range(-l_value, l_value + 1):
+        file_name = input_file # + "Rpsi4_l" + str(l_value) + "_m" + str(m) + "_r0100.0.txt"
+        if not os.path.isfile(file_name):
+            print(f"File {file_name} does not exist. Skipping...")
+            continue
 
-    time, cumulative_phase, amplitude, omega = process_wave_data(time, real, imag)
+        # Read the data from the file
+        time_data, mode_data = read_psi4(file_name)
+        real, imag = mode_data[(l_value, m)]
 
-    
-    output_file = file_name
-    if file_name.endswith('.asc'):
-        output_file = output_file.replace('.asc', '_phase_amp_omega.asc')
-    elif file_name.endswith('.txt'):
-        output_file = output_file.replace('.txt', '_phase_amp_omega.txt')
+        # Process the wave data
+        time, cum_phase, amplitude, cum_phase_derivative = process_wave_data(time_data, real, imag)
+        omega_min_quad_fit = fit_quadratic_and_output_min_omega(time, cum_phase_derivative)
 
-    with open(output_file, 'w') as file:
-        file.write("# Time    cumulative_phase    amplitude    omega\n")
-        for t, cp, a, o in zip(time, cumulative_phase, amplitude, omega):
-            file.write(f"{t:.15f} {cp:.15f} {a:.15f} {o:.15f}\n")
+        # Compute FFT
+        freq, fft_data = perform_complex_fft(time, real, imag)
+        time, cumulative_phase, amplitude, omega = process_wave_data(time, real, imag)
 
-    print(f"Processed data has been saved to {output_file}")
+        min_omega = fit_quadratic_and_output_min_omega(time, omega)
 
-    min_omega = fit_quadratic_and_output_min_omega(time, omega)
+        # Perform the FFT
+        fft_result = np.fft.fft(real + 1j * imag)
 
-    # Perform the FFT
-    fft_result = np.fft.fft(real + 1j * imag)
+        # Calculate angular frequencies
+        omega_list = np.fft.fftfreq(len(time), time[1] - time[0]) * 2 * np.pi
 
-    # Calculate angular frequencies
-    omega_list = np.fft.fftfreq(len(time), time[1] - time[0]) * 2 * np.pi
+        # Just below Eq. 27 in https://arxiv.org/abs/1006.1632
+        for i, omega in enumerate(omega_list):
+            if np.fabs(omega) <= min_omega:
+                fft_result[i] *= 1 / (1j * min_omega) ** 2
+            else:
+                fft_result[i] *= 1 / (1j * np.fabs(omega)) ** 2
 
-    # Just below Eq. 27 in https://arxiv.org/abs/1006.1632
-    for i, omega in enumerate(omega_list):
-        if np.fabs(omega) <= min_omega:
-            fft_result[i] *= 1 / (1j * min_omega) ** 2
-        else:
-            fft_result[i] *= 1 / (1j * np.fabs(omega)) ** 2
+        # Now perform the inverse FFT
+        second_integral_complex = np.fft.ifft(fft_result)
 
-    # Now perform the inverse FFT
-    second_integral_complex = np.fft.ifft(fft_result)
+        # Separate the real and imaginary parts of the second time integral
+        second_integral_real = np.real(second_integral_complex)
+        second_integral_imag = np.imag(second_integral_complex)
+        
+        output_file = output_directory + "Rpsi4_l_" + str(l_value) + "_m_" + str(m) + "-r0100.0.txt"
+        with open(output_file, 'w') as file:
+            file.write("# Time    Second_Integral_Real    Second_Integral_Imag\n")
+            for t, real, imag in zip(time, second_integral_real, second_integral_imag):
+                file.write(f"{t:.15f} {real:.15f} {imag:.15f}\n")
 
-    # Separate the real and imaginary parts of the second time integral
-    second_integral_real = np.real(second_integral_complex)
-    second_integral_imag = np.imag(second_integral_complex)
-    
-    # Save the output to a file with _strain.{asc or txt} extension
-    output_file = file_name
-    if file_name.endswith('.asc'):
-        output_file = output_file.replace('.asc', '_strain.asc')
-    elif file_name.endswith('.txt'):
-        output_file = output_file.replace('.txt', '_strain.txt')
-
-    with open(output_file, 'w') as file:
-        file.write("# Time    Second_Integral_Real    Second_Integral_Imag\n")
-        for t, real, imag in zip(time, second_integral_real, second_integral_imag):
-            file.write(f"{t:.15f} {real:.15f} {imag:.15f}\n")
-
-    print(f"Second time integral data has been saved to {output_file}")
-
-    # Calculate the second time derivative of second_integral_real and second_integral_imag
-    second_derivative_real = compute_second_derivative(time, second_integral_real)
-    second_derivative_imag = compute_second_derivative(time, second_integral_imag)
-    with open("check.txt", 'w') as file:
-        file.write("# Time    Second_Integral_Real    Second_Integral_Imag\n")
-        for t, real, imag in zip(time, second_derivative_real, second_derivative_imag):
-            file.write(f"{t:.15f} {real:.15f} {imag:.15f}\n")
-    
-
-    
+        print(f"Second time integral data has been saved to {output_file}")
+        
 if __name__ == "__main__":
     main()
