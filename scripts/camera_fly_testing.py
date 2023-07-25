@@ -339,8 +339,8 @@ def fly():
     # that help to determine where in [0,1] the control points occur.
     cpts = (c0, c1, c2, c3, c4, c5)
     x=[]
-    for i in range(7): # Personal Note: change this if you have more than 7 control points
-        x = x + [float(i) / float(6.)]
+    for i in range(6): # Personal Note: change this if you have more than 7 control points
+        x = x + [float(i) / float(5.)]
  
     # Animate the camera. Note that we use the new built-in EvalCubicSpline
     # function which takes a t value from [0,1] a tuple of t values and a tuple

@@ -42,6 +42,8 @@ def set_sph_harm_array(l, m, s, numTheta, numRadius, display_radius):
 
             # Calculate the spherical harmonic
             Y_lm = sph_harm(m, l, theta, phi)
+
+            # Adjust for spin-weighted
             Y = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * np.math.factorial(l - m) / np.math.factorial(l + m)) * Y_lm
 
             # Store the spherical harmonic in the array
