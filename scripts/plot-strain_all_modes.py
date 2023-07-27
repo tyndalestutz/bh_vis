@@ -1,19 +1,17 @@
-# Author: Tyndale Stutzman
-# Last Modified: 07.06.23
-#
-# Note: This script is currently functional. It's purpose is to generate a bare bones, basic plot
-#   for each mode and save it as a png. 
+# Created with GPT4, this script generates a strain plot for every given 
+# mode and saves each one as a png, located in the specified directory.
 
-import os
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
 import re
+import sys
 
-# File parameters
-folder_name = "sum_test"
-parent_directory = os.path.dirname(os.path.dirname(__file__))
-output_directory = "/home/guest/Documents/Users/Tyndale/bh_repos/bhah_waveform_analysis/r0100.0/many_modes/"
+# Get the output directory from the command-line argument
+if len(sys.argv) < 2:
+    print("Usage: python script.py <output_directory>")
+    sys.exit(1)
+output_directory = sys.argv[1]
 
 # Get a list of all files that begin with "Rpsi4"
 input_files = glob.glob("/home/guest/Documents/Users/Tyndale/bh_repos/bhah_waveform_analysis/r0100.0/many_modes/Rpsi4*")
@@ -59,18 +57,14 @@ for data, l, m in data_modes:
 
     # Create the plot
     fig, ax = plt.subplots()
-
-    # Plot the data
     ax.plot(h_time, strain_magnitude)
-
-    # Set titles for the axes
     ax.set_xlabel('Time')
     ax.set_ylabel('Strain')
-
-    # Set title for the plot
     ax.set_title(f'Mode (l, m): ({l}, {m})')
 
     # Save the figure
-    #plt.savefig(f"{output_directory}strain_mode_l{l}_m{m}.png")
+    plt.savefig(f"{output_directory}strain_mode_l{l}_m{m}.png")
     
-    #plt.close(fig)
+    plt.close(fig)
+
+print("All files have been saved to " + output_directory)

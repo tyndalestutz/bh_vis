@@ -268,4 +268,3 @@ with open(bh_data, 'r') as file:
 #movie_name = "streamline_crop_example.mp4"
 # The following command worked to create a movie from the file of pngs
 #ffmpeg -framerate 1000 -i synthetic_BH_test_animation%04d.png -vf "scale=770:-2" -c:v libx264 -r 1000 -pix_fmt yuv420p output.mp4
-

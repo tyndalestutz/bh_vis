@@ -1,3 +1,6 @@
+# This is currently the primary python script for animating a
+# bh merger with polar gravitational wave meshes. 
+
 import sys, csv, os
 sys.path.append("/usr/local/3.3.1/linux-x86_64/lib/site-packages") 
 import visit
@@ -10,16 +13,9 @@ parent_directory = os.path.dirname(os.path.dirname(__file__))
 # In order for the render to record, 'record_render' must be True
 record_render = False
 
-# object 0: Black hole 1
-# object 1: Black hole 2
-# bh1_x, bh2_x, etc are the values of the xyz coordinates of each black hole
-# L1_X, L2_x, etc are the xyz magnitudes of angular momentum (L) vectors 1 and 2.
-
-# Note: fix this db path
-bh_database = "/home/guest/Documents/BH_Vis_local/data/mesh/spheres/iscos_sphere_sub8.obj"
+bh_database = "/home/guest/data/horizon_data_obj/h.t277632.ah2_state0.obj"
 bh_data = "/home/guest/Documents/bh_vis/scripts/sorted.csv"
 gw_database = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test8_polar_zeroR_r=200/state*.vtu database"
-print(gw_database)
 
 # Parameters
 green_screen = False
@@ -106,20 +102,6 @@ def create_spheres():
     v.AddPlot("Pseudocolor", "mesh_quality/warpage", 1, 1)
     v.AddOperator("Transform")
     v.SetPlotOptions(v.PseudocolorAtts)
-'''
-# Custom Color Table
-def MakeRGBColorTable(name, ct):
-    ccpl = v.ColorControlPointList()
-    for pt in ct:
-        p = v.ColorControlPoint()
-        p.colors = (pt[0] * 255, pt[1] * 255, pt[2] * 255, 255)
-        p.position = pt[3]
-        ccpl.AddControlPoints(p)
-    v.AddColorTable(name, ccpl)
-
-ct = ((1, 1, 0, 0.0), (0, 0, 1, 0.5), (1, 1, 0, 1))
-MakeRGBColorTable("custom_table1", ct)
-'''
 
 def create_gw():
     visit.OpenDatabase(gw_database)
@@ -160,26 +142,7 @@ def set_coords(objNum, x, y, z):
 
 default_atts()
 create_spheres()
-create_gw()
-
-'''
-L1 = v.CreateAnnotationObject("Line3D")
-L2 = v.CreateAnnotationObject("Line3D")
-
-L1.useForegroundForLineColor = 0
-L1.color = (255, 255, 255, 255)
-L1.width = 3
-L1.arrow2 = 1
-L1.arrow2Height = 0.2
-L1.arrow2Radius = 0.075
-
-L2.useForegroundForLineColor = 0
-L2.color = (255, 255, 255, 255)
-L2.width = 3
-L2.arrow2 = 1
-L2.arrow2Height = 0.2
-L2.arrow2Radius = 0.075
-'''
+#create_gw()
 
 with open(bh_data, 'r') as file:
     reader = csv.reader(file)
@@ -192,20 +155,9 @@ with open(bh_data, 'r') as file:
         bh1_x = float(row[1])
         bh1_y = float(row[3])
         bh1_z = 2 #float(row[3])
-        #L1_x = float(row[4])
-        #L1_y = float(row[5])
-        #L1_z = float(row[6])
         bh2_x = float(row[2])
         bh2_y = float(row[4])
         bh2_z = 2 #float(row[9])
-        #L2_x = float(row[10])
-        #L2_y = float(row[11])
-        #L2_z = float(row[12])
-        
-        #L1.point1 = (bh1_x, bh1_y, bh1_z)
-        #L1.point2 = (bh1_x + L1_x, bh1_y + L1_y, bh1_z + L1_z)
-        #L2.point1 = (bh2_x, bh2_y, bh2_z)
-        #L2.point2 = (bh2_x + L2_x, bh2_y + L2_y, bh2_z + L2_z)
         set_coords(0, bh1_x, bh1_y, bh1_z)
         set_coords(1, bh2_x, bh2_y, bh2_z)
         v.DrawPlots()

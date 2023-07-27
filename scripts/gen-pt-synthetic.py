@@ -1,3 +1,6 @@
+# This script produces synthetic puncture tracker (pt) data
+# to be used for demonstrations with VisIt animations.
+
 from scipy import special
 from math import pi,cos,sin
 import os

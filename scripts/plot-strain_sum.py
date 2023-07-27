@@ -1,9 +1,5 @@
-# Author: Tyndale Stutzman
-#
-#
-# Note: This script is currently functional. It's purpose is to plot the sum of all modes, excluding (l, 0) modes, 
-#   and compare them against the control mode, (2, 0).
-
+# Created with GPT4, this script sums of all modes, excluding (l, 0) modes, 
+# and compares them against the control mode, (2, 2).
 
 import os
 import glob
@@ -81,13 +77,10 @@ ax.plot(h_time, sum_strain, label='Sum of Strain excluding (l, 0) modes')
 
 # Plot the strain data for the specific mode, if found
 if specific_mode_data is not None:
-    ax.plot(h_time, specific_mode_data, label=f'Specific mode (l, m): ({l_specific}, {m_specific})', color='red')
+    ax.plot(h_time, specific_mode_data, label=f'Control mode (l, m): ({l_specific}, {m_specific})', color='red')
 
 # Set titles for the axes
 ax.set_xlabel('Time')
 ax.set_ylabel('Strain')
-
-# Show legend
 ax.legend()
-
 plt.show()
