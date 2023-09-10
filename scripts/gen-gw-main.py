@@ -13,42 +13,32 @@ parent_directory = os.path.dirname(os.path.dirname(__file__))
 output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test10_polar_zeroR_r=300/"
 
 # Parameters
-numTheta = 180  # Number of points along the theta direction
 numRadius = 450 # Number of points along the radius direction
-new_numTheta = 720
+numTheta = 180  # Number of points along the theta direction
 new_numRadius = 300
+new_numTheta = 720
 change_time = 4150
 display_radius = 300 # Mesh radius
 R_ext = 100 # Extraction radius
 l = 2
 m = 2
+s = -2
 plot_strain = True
 
-def set_sph_harm_array(l, m, s, numTheta, numRadius, display_radius):
+def set_sph_harm_array(l, m, s, radius_array, theta_array):
     # Initialize the spherical harmonic array
-    sph_harm_points = np.zeros((numTheta, numRadius), dtype=np.complex128)
-
+    sph_harm_points = np.zeros((len(radius_array), len(theta_array) ), dtype=np.complex128)
+    phi = np.pi / 2  # phi is fixed to pi/2, similar to the original script
+    yspin = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * np.math.factorial(l - m) / np.math.factorial(l + m))
     # Loop over all points in the grid
-    for j in range(numRadius):
-        for i in range(numTheta):
+    for j, radius in enumerate(radius_array):
+        for i, theta in enumerate(theta_array):
             # Calculate the radial and angular coordinates
-            radius = display_radius * j / (numRadius - 1)
-            theta = 2 * np.pi * i / numTheta
-            
-            # Calculate the spherical coordinates
-            r = radius
-            theta = theta
-            phi = np.pi / 2  # phi is fixed to pi/2, similar to the original script
-
             # Calculate the spherical harmonic
-            Y_lm = sph_harm(m, l, theta, phi)
-
+            Y = yspin * sph_harm(m, l, theta, phi)
             # Adjust for spin-weighted
-            Y = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * np.math.factorial(l - m) / np.math.factorial(l + m)) * Y_lm
-
             # Store the spherical harmonic in the array
-            sph_harm_points[i, j] = Y
-
+            sph_harm_points[j, i] = Y
     return sph_harm_points
 
 # Linearly interpolate strain for any given time
@@ -61,17 +51,16 @@ def interpolated_strain(target_time, source_time, data):
     interpolated_data = np.interp(target_time, source_time, data)
     return interpolated_data
 
-# Reads inputted strain data - returns data file row length, initial strain data (complex), spin-weighted spherical harmonics (complex), and time values
+# Reads inputted strain data - returns data file row length, initial strain data (complex), and time values
 def initialize():
-    if os.path.exists(output_directory):
-        if len(os.listdir(output_directory)) != 0:
-            answer = input(f"Data already exists at {output_directory}. Overwrite it? You cannot undo this action. (Y/N) ")
-            if answer.capitalize() == "Y":
-                for file in os.listdir(output_directory):
-                    os.remove(f"{output_directory}/{file}")
-            else:
-                print("Exiting Program. Change output directory to an empty directory.")
-                exit()
+    if os.path.exists(output_directory) and (len(os.listdir(output_directory)) != 0):
+        answer = input(f"Data already exists at {output_directory}. Overwrite it? You cannot undo this action. (Y/N) ")
+        if answer.capitalize() == "Y":
+            for file in os.listdir(output_directory):
+                os.remove(f"{output_directory}/{file}")
+        else:
+            print("Exiting Program. Change output directory to an empty directory.")
+            exit()
     else:
         last_slash_index = output_directory.rfind("/")
         super_directory = output_directory[:last_slash_index] if last_slash_index != -1 else output_directory
@@ -93,11 +82,9 @@ def initialize():
 
     length = len(h_strain)
 
-    sph_harm_points = set_sph_harm_array(2, 2, -2, numTheta, numRadius, display_radius)
+    return length, h_strain, h_time
 
-    return length, h_strain, sph_harm_points, h_time
-
-length, h_strain, sph_harm_points, h_time = initialize()
+length, h_strain, h_time = initialize()
 ######################
 # Create a figure and axes
 from matplotlib.animation import FuncAnimation
@@ -129,19 +116,23 @@ plt.show()
 # Iterate over all points and construct mesh
 start_time = time.time()
 percentage = np.round(np.linspace(0, length, 101)).astype(int)
-state = 0
 scale_factor = 600
 status_messages = True
-omit_radius = 3
+omit_radius = 4
 
 # Pre-compute the theta and radius values outside the loop
-sph_harm_points = set_sph_harm_array(2, 2, -2, numTheta, numRadius, display_radius)
-theta_values = np.linspace(0, 2 * np.pi, numTheta, endpoint=False)
 radius_values = np.linspace(0, display_radius, numRadius)
+theta_values = np.linspace(0, 2 * np.pi, numTheta, endpoint=False)
+rv, tv = np.meshgrid(radius_values, theta_values, indexing='ij')
+x_values = rv * np.cos(tv)
+y_values = rv * np.sin(tv)
+sph_harm_points = set_sph_harm_array(l, m, s, radius_values, theta_values)
+time_0 = np.min(h_time)
+time_f = np.max(h_time)
 
 # Main Loop
-for current_time in h_time:
-    state += 1
+for state, current_time in enumerate(h_time, start=1):
+    # what is t? it looks like the same as state
     t = np.where(h_time == current_time)[0][0]
     if status_messages and t == 10:
         end_time = time.time()
@@ -154,7 +145,7 @@ for current_time in h_time:
     if current_time >= change_time:
         numTheta = new_numTheta
         numRadius = new_numRadius
-        sph_harm_points = set_sph_harm_array(2, 2, -2, numTheta, numRadius, display_radius)
+        sph_harm_points = set_sph_harm_array(l, m, s, numTheta, numRadius, display_radius)
     '''
     # Create vtkUnstructuredGrid
     grid = vtk.vtkUnstructuredGrid()
@@ -168,37 +159,23 @@ for current_time in h_time:
     # Define the points and their coordinates
     points = vtk.vtkPoints()
     index = 0
-    for j in range(numRadius):
-        for i in range(numTheta):
-            theta = theta_values[i]
-            radius = radius_values[j]
-            x = radius * math.cos(theta)
-            y = radius * math.sin(theta)
-            current_r = np.sqrt(x ** 2 + y ** 2)
-            target_time = current_time - current_r + R_ext
-            time_0 = np.min(h_time)
-            time_f = np.max(h_time)
-            if target_time < time_0:
-                target_time = time_0
-            elif target_time > time_f:
-                target_time = time_f
-            h_tR = interpolated_strain(target_time, h_time, h_strain)
-            Y = sph_harm_points[i, j]
-            z = (Y.real * h_tR.real - Y.imag * h_tR.imag) * scale_factor
-            strain_value = z / scale_factor
+    for j, radius in enumerate(radius_values):
+        target_time = current_time - radius + R_ext
+        if target_time < time_0:
+            target_time = time_0
+        elif target_time > time_f:
+            target_time = time_f
+        h_tR = interpolated_strain(target_time, h_time, h_strain)
+        for i, enumerate in enumerate(theta_values):
+            x = x_values[j, i]
+            y = y_values[j, i]
+            Y = sph_harm_points[j, i]
+            strain_value = Y.real * h_tR.real - Y.imag * h_tR.imag
+            z =  strain_value * scale_factor
             # Introduce a discontinuity to make room for the Black Holes
-            if current_r <= 4:
+            if radius <= omit_radius:
                 z = np.nan
                 strain_value = np.nan
-                points.InsertNextPoint(x, y, z)
-                strain_array.SetTuple1(index, strain_value)
-                index += 1
-                continue
-            '''
-            if current_r <= 4:
-                z = -10
-                strain_value = 0
-            '''
             points.InsertNextPoint(x, y, z)
             strain_array.SetTuple1(index, strain_value)
             index += 1
