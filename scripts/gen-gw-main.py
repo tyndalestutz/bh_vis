@@ -85,7 +85,7 @@ def initialize():
 length, h_strain, h_time = initialize()
 
 # Iterate over all points and construct mesh
-start_time = time.time()
+
 percentage = np.round(np.linspace(0, length, 101)).astype(int)
 scale_factor = 600
 status_messages = True
@@ -101,16 +101,26 @@ sph_harm_points = set_sph_harm_array(l, m, s, radius_values, theta_values)
 time_0 = np.min(h_time)
 time_f = np.max(h_time)
 
+t_array = np.zeros((len(h_time), len(radius_values)))
+for state, current_time in enumerate(h_time, start=1):
+    for j, radius in enumerate(radius_values):
+        target_time = current_time - radius + R_ext
+        if target_time < time_0:
+            target_time = time_0
+        elif target_time > time_f:
+            target_time = time_f
+        t_array[state][j]= target_time
+h_array = np.interp(t_array, h_time, h_strain)
+
+start_time = time.time()
 # Main Loop
 for state, current_time in enumerate(h_time, start=1):
-    # what is t? it looks like the same as state
-    t = np.where(h_time == current_time)[0][0]
-    if status_messages and t == 10:
+    if status_messages and state == 11:
         end_time = time.time()
         eta = (end_time - start_time) * length / 10
         print(f"Creating {length} meshes and saving them to {output_directory}.\nEstimated time: {eta}")
-    if status_messages and t != 0 and np.isin(t, percentage):
-        print(f" {int(t * 100 / (length - 1))}% done", end="\r")
+    if status_messages and state != 0 and np.isin(state, percentage):
+        print(f" {int(state * 100 / (length - 1))}% done", end="\r")
     '''
     # Change resolution at the specified time
     if current_time >= change_time:
@@ -131,12 +141,7 @@ for state, current_time in enumerate(h_time, start=1):
     points = vtk.vtkPoints()
     index = 0
     for j, radius in enumerate(radius_values):
-        target_time = current_time - radius + R_ext
-        if target_time < time_0:
-            target_time = time_0
-        elif target_time > time_f:
-            target_time = time_f
-        h_tR = interpolated_strain(target_time, h_time, h_strain)
+        h_tR = h_array[state][j]
         for i, theta in enumerate(theta_values):
             x = x_values[j, i]
             y = y_values[j, i]
