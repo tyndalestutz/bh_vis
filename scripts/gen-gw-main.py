@@ -10,14 +10,11 @@ from scipy.special import sph_harm
 folder_name = "gw_test"
 input_file = "/home/guest/Documents/bh_vis/scripts/Rpsi4_l2-r0100.0_strain.txt"
 parent_directory = os.path.dirname(os.path.dirname(__file__))
-output_directory = "/home/guest/Documents/BH_Vis_local/data/mesh/gw_test10_polar_zeroR_r=300/"
+output_directory = "./gw_test12/"
 
 # Parameters
 numRadius = 450 # Number of points along the radius direction
 numTheta = 180  # Number of points along the theta direction
-new_numRadius = 300
-new_numTheta = 720
-change_time = 4150
 display_radius = 300 # Mesh radius
 R_ext = 100 # Extraction radius
 l = 2
@@ -53,14 +50,15 @@ def interpolated_strain(target_time, source_time, data):
 
 # Reads inputted strain data - returns data file row length, initial strain data (complex), and time values
 def initialize():
-    if os.path.exists(output_directory) and (len(os.listdir(output_directory)) != 0):
-        answer = input(f"Data already exists at {output_directory}. Overwrite it? You cannot undo this action. (Y/N) ")
-        if answer.capitalize() == "Y":
-            for file in os.listdir(output_directory):
-                os.remove(f"{output_directory}/{file}")
-        else:
-            print("Exiting Program. Change output directory to an empty directory.")
-            exit()
+    if os.path.exists(output_directory):
+        if(len(os.listdir(output_directory)) != 0):
+            answer = input(f"Data already exists at {output_directory}. Overwrite it? You cannot undo this action. (Y/N) ")
+            if answer.capitalize() == "Y":
+                for file in os.listdir(output_directory):
+                    os.remove(f"{output_directory}/{file}")
+            else:
+                print("Exiting Program. Change output directory to an empty directory.")
+                exit()
     else:
         last_slash_index = output_directory.rfind("/")
         super_directory = output_directory[:last_slash_index] if last_slash_index != -1 else output_directory
@@ -85,34 +83,7 @@ def initialize():
     return length, h_strain, h_time
 
 length, h_strain, h_time = initialize()
-######################
-# Create a figure and axes
-from matplotlib.animation import FuncAnimation
 
-# Set up the figure size in inches
-fig, ax = plt.subplots(figsize=(772/80, 80/80))
-
-# Calculate the magnitude of the strain for each time step
-strain_magnitude = np.real(h_strain)
-
-# Initial plot
-line, = ax.plot(h_time[0], strain_magnitude[0])
-
-# Set the labels
-ax.set_xlabel('Time')
-ax.set_ylabel('Strain')
-
-# Slider update function
-def update(i):
-    line.set_ydata(strain_magnitude[i])  # update the data
-    line.set_xdata(h_time[i])
-    return line,
-
-# Animation
-ani = FuncAnimation(fig, update, frames=range(len(h_time)), blit=True)
-
-plt.show()
-##########################
 # Iterate over all points and construct mesh
 start_time = time.time()
 percentage = np.round(np.linspace(0, length, 101)).astype(int)
@@ -166,7 +137,7 @@ for state, current_time in enumerate(h_time, start=1):
         elif target_time > time_f:
             target_time = time_f
         h_tR = interpolated_strain(target_time, h_time, h_strain)
-        for i, enumerate in enumerate(theta_values):
+        for i, theta in enumerate(theta_values):
             x = x_values[j, i]
             y = y_values[j, i]
             Y = sph_harm_points[j, i]
