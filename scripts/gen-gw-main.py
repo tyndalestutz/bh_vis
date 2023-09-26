@@ -57,29 +57,24 @@ def interpolated_strain(target_time, source_time, data):
 
 # Reads inputted strain data - returns data file row length, initial strain data (complex), and time values
 def initialize():
-    if os.path.exists(output_directory):
-        if len(os.listdir(output_directory)) != 0:
-            answer = input(
-                f"Data already exists at {output_directory}. Overwrite it? You cannot undo this action. (Y/N) "
-            )
-            if answer.capitalize() == "Y":
-                for file in os.listdir(output_directory):
-                    os.remove(f"{output_directory}/{file}")
-            else:
-                print("Exiting Program. Change output directory to an empty directory.")
-                exit()
-    else:
-        last_slash_index = output_directory.rfind("/")
-        super_directory = (
-            output_directory[:last_slash_index]
-            if last_slash_index != -1
-            else output_directory
-        )
+    if not os.path.exists(output_directory):
+        super_directory = os.path.dirname(output_directory)
         if os.path.exists(super_directory):
             os.makedirs(output_directory)
         else:
             print(f"Error: {super_directory} does not exist.")
             exit()
+    else:
+        if os.listdir(output_directory):
+            answer = input(
+                f"Data already exists at {output_directory}. Overwrite it? You cannot undo this action. (Y/N) "
+            )
+            if answer.capitalize() == "Y":
+                for file in os.listdir(output_directory):
+                    os.remove(os.path.join(output_directory, file))
+            else:
+                print("Exiting Program. Change output directory to an empty directory.")
+                exit()
 
     def valid_line(line):
         return not line.startswith("#")
