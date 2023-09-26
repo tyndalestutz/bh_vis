@@ -113,7 +113,7 @@ time_0 = np.min(h_time)
 time_f = np.max(h_time)
 
 t_array = np.zeros((len(h_time), len(radius_values)))
-for state, current_time in enumerate(h_time, start=1):
+for state, current_time in enumerate(h_time):
     for j, radius in enumerate(radius_values):
         target_time = current_time - radius + R_ext
         if target_time < time_0:
@@ -125,7 +125,7 @@ h_array = np.interp(t_array, h_time, h_strain)
 
 start_time = time.time()
 # Main Loop
-for state, current_time in enumerate(h_time, start=1):
+for state, current_time in enumerate(h_time):
     if status_messages and state == 11:
         end_time = time.time()
         eta = (end_time - start_time) * length / 10
