@@ -3,7 +3,9 @@
 import numpy as np
 import os
 import re
+import sys
 from scipy.optimize import curve_fit
+
 
 def read_psi4(file_name):
     """
@@ -19,9 +21,9 @@ def read_psi4(file_name):
     mode_data = {}
     time_data = []
 
-    with open(file_name, 'r') as file:
+    with open(file_name, "r") as file:
         # Read the lines and ignore lines starting with #
-        lines = [line for line in file.readlines() if not line.startswith('#')]
+        lines = [line for line in file.readlines() if not line.startswith("#")]
 
     # Convert lines to arrays and sort by time
     data = np.array([list(map(np.float64, line.split())) for line in lines])
@@ -35,7 +37,7 @@ def read_psi4(file_name):
     time_data = data[:, 0]
 
     # Extract l from the filename
-    l = int(file_name.split('_')[1][1:].split('-')[0])
+    l = int(file_name.split("_")[1][1:].split("-")[0])
 
     # Loop through columns and store real and imaginary parts in mode_data
     for m in range(-l, l + 1):
@@ -66,32 +68,37 @@ def compute_first_derivative(time, data):
 
     return derivative
 
-def compute_second_derivative(time, data):
-    """
-    Computes the second time derivative of the input data using the second-order finite difference method,
-    with upwind/downwind stencils for the endpoints.
 
-    Args:
-        time (numpy.ndarray): A numpy array containing time values.
-        data (numpy.ndarray): A numpy array containing data for which the second time derivative is to be calculated.
+# def compute_second_derivative(time, data):
+#     """
+#     Computes the second time derivative of the input data using the second-order finite difference method,
+#     with upwind/downwind stencils for the endpoints.
 
-    Returns:
-        numpy.ndarray: A numpy array containing the second time derivative of the input data.
-    """
-    dt = time[1] - time[0]
-    n = len(data)
-    second_derivative = np.zeros(n)
+#     Args:
+#         time (numpy.ndarray): A numpy array containing time values.
+#         data (numpy.ndarray): A numpy array containing data for which the second time derivative is to be calculated.
 
-    # Interior points using central finite difference
-    second_derivative[1:-1] = (data[:-2] - 2 * data[1:-1] + data[2:]) / (dt ** 2)
+#     Returns:
+#         numpy.ndarray: A numpy array containing the second time derivative of the input data.
+#     """
+#     dt = time[1] - time[0]
+#     n = len(data)
+#     second_derivative = np.zeros(n)
 
-    # Endpoint 0: forward finite difference (downwind)
-    second_derivative[0] = (2 * data[0] - 5 * data[1] + 4 * data[2] - data[3]) / (dt ** 2)
+#     # Interior points using central finite difference
+#     second_derivative[1:-1] = (data[:-2] - 2 * data[1:-1] + data[2:]) / (dt**2)
 
-    # Endpoint n-1: backward finite difference (upwind)
-    second_derivative[-1] = (2 * data[-1] - 5 * data[-2] + 4 * data[-3] - data[-4]) / (dt ** 2)
+#     # Endpoint 0: forward finite difference (downwind)
+#     second_derivative[0] = (2 * data[0] - 5 * data[1] + 4 * data[2] - data[3]) / (
+#         dt**2
+#     )
 
-    return second_derivative
+#     # Endpoint n-1: backward finite difference (upwind)
+#     second_derivative[-1] = (2 * data[-1] - 5 * data[-2] + 4 * data[-3] - data[-4]) / (
+#         dt**2
+#     )
+
+#     return second_derivative
 
 
 def process_wave_data(time, real, imag):
@@ -104,7 +111,7 @@ def process_wave_data(time, real, imag):
         imag (numpy.ndarray): A numpy array containing the imaginary part of the signal.
 
     Returns:
-        tuple: A tuple containing three numpy arrays (time, cumulative_phase, amplitude).
+        tuple: A tuple containing three numpy arrays (time, cumulative_phase, amplitude, cumulative_phase_derivative).
     """
     # Calculate the amplitude of the gravitational wave signal.
     amplitude = np.sqrt((real**2 + imag**2), dtype=np.float64)
@@ -149,7 +156,6 @@ def process_wave_data(time, real, imag):
 
     return time, cum_phase, amplitude, cum_phase_derivative
 
-import sys
 
 def fit_quadratic_and_output_min_omega(time, omega):
     def quadratic(x, a, b, c):
@@ -170,8 +176,7 @@ def fit_quadratic_and_output_min_omega(time, omega):
 
     print(f"The extremum of the quadratic curve occurs at t = {extremum_x:.15f} with omega = {omega_min_quad_fit:.15f} . implied omega(t=0) = {omega_at_t_zero:.15f}")
     return np.fabs(omega_at_t_zero)
-    
-import numpy as np
+
 
 def perform_complex_fft(time, real, imag):
     """
@@ -183,7 +188,7 @@ def perform_complex_fft(time, real, imag):
         imag (numpy.ndarray): A numpy array containing the imaginary part of the signal.
 
     Returns:
-        tuple: A tuple containing two numpy arrays (frequencies, fft_data).
+        tuple: A tuple containing two numpy arrays (angular_frequencies, fft_data).
     """
     # Combine the real and imaginary data into a single complex signal
     complex_signal = real + 1j * imag
@@ -194,9 +199,10 @@ def perform_complex_fft(time, real, imag):
     # Calculate the frequency values
     dt = time[1] - time[0]
     n = len(time)
-    frequencies = np.fft.fftfreq(n, d=dt)
+    angular_frequencies = np.fft.fftfreq(n, d=dt) * 2 * np.pi
 
-    return frequencies, fft_data
+    return angular_frequencies, fft_data
+
 
 def main():
     """
@@ -207,39 +213,26 @@ def main():
         print("Usage: python3 phase_amp_omega.py <gravitational_wave_data directory> <l value>")
         sys.exit(1)
 
-    #directory = sys.argv[1]
-    input_file = sys.argv[1]
+    file_name = sys.argv[1]
     output_directory = sys.argv[2]
     l_value = int(sys.argv[3])
 
+    if not os.path.isfile(file_name):
+        print(f"File {file_name} does not exist. Ending...")
+        return
+
+    # Read the data from the file
+    time_data, mode_data = read_psi4(file_name)
 
     # Loop over each m value
     for m in range(-l_value, l_value + 1):
-        file_name = input_file # + "Rpsi4_l" + str(l_value) + "_m" + str(m) + "_r0100.0.txt"
-        if not os.path.isfile(file_name):
-            print(f"File {file_name} does not exist. Skipping...")
-            continue
-
-        # Read the data from the file
-        time_data, mode_data = read_psi4(file_name)
         real, imag = mode_data[(l_value, m)]
+        time, unused_cumulative_phase, unused_amplitude, cumulative_phase_derivative = process_wave_data(time_data, real, imag)
+        min_omega = fit_quadratic_and_output_min_omega(time, cumulative_phase_derivative)
+        # Perform FFT
+        omega_list, fft_result = perform_complex_fft(time, real, imag)
 
-        # Process the wave data
-        time, cum_phase, amplitude, cum_phase_derivative = process_wave_data(time_data, real, imag)
-        omega_min_quad_fit = fit_quadratic_and_output_min_omega(time, cum_phase_derivative)
-
-        # Compute FFT
-        freq, fft_data = perform_complex_fft(time, real, imag)
-        time, cumulative_phase, amplitude, omega = process_wave_data(time, real, imag)
-
-        min_omega = fit_quadratic_and_output_min_omega(time, omega)
-
-        # Perform the FFT
-        fft_result = np.fft.fft(real + 1j * imag)
-
-        # Calculate angular frequencies
-        omega_list = np.fft.fftfreq(len(time), time[1] - time[0]) * 2 * np.pi
-
+        # Fixed Frequency Integration
         # Just below Eq. 27 in https://arxiv.org/abs/1006.1632
         for i, omega in enumerate(omega_list):
             if np.fabs(omega) <= min_omega:
@@ -253,14 +246,15 @@ def main():
         # Separate the real and imaginary parts of the second time integral
         second_integral_real = np.real(second_integral_complex)
         second_integral_imag = np.imag(second_integral_complex)
-        
+
         output_file = output_directory + "Rpsi4_l_" + str(l_value) + "_m_" + str(m) + "-r0100.0.txt"
-        with open(output_file, 'w') as file:
+        with open(output_file, "w") as file:
             file.write("# Time    Second_Integral_Real    Second_Integral_Imag\n")
             for t, real, imag in zip(time, second_integral_real, second_integral_imag):
                 file.write(f"{t:.15f} {real:.15f} {imag:.15f}\n")
 
         print(f"Second time integral data has been saved to {output_file}")
-        
+
+
 if __name__ == "__main__":
     main()
