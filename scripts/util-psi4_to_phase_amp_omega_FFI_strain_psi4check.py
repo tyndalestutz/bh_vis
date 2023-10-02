@@ -222,12 +222,12 @@ def main():
         return
 
     # Read the data from the file
-    time_data, mode_data = read_psi4(file_name)
+    time, mode_data = read_psi4(file_name)
 
     # Loop over each m value
     for m in range(-l_value, l_value + 1):
         real, imag = mode_data[(l_value, m)]
-        time, unused_cumulative_phase, unused_amplitude, cumulative_phase_derivative = process_wave_data(time_data, real, imag)
+        unused_time, unused_cumulative_phase, unused_amplitude, cumulative_phase_derivative = process_wave_data(time, real, imag)
         min_omega = fit_quadratic_and_output_min_omega(time, cumulative_phase_derivative)
         # Perform FFT
         omega_list, fft_result = perform_complex_fft(time, real, imag)
