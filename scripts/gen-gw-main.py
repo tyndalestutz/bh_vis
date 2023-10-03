@@ -119,7 +119,13 @@ for state, current_time in enumerate(h_time):
             target_time = time_0
         elif target_time > time_f:
             target_time = time_f
-        t_array[state][j] = target_timefolder_name
+        t_array[state][j] = target_time
+h_array = np.interp(t_array, h_time, h_strain)
+
+start_time = time.time()
+# Main Loop
+for state, current_time in enumerate(h_time):
+    if status_messages and state == 11:
         end_time = time.time()
         eta = (end_time - start_time) * length / 10
         print(

@@ -155,7 +155,7 @@ def main():
     and saves the output to a file. The input filename is provided via command line.
     """
     if len(sys.argv) != 4:
-        print("Usage: util-psi4-FFT-integration.py <path to gravitational wave Rpsi4 file> <path to output directory/> <l value>")
+        print("Usage: python3 util-psi4-FFT-integration.py <path to gravitational wave Rpsi4 file> <path to output directory/> <l value>")
         sys.exit(1)
 
     file_name = sys.argv[1]
@@ -203,4 +203,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
