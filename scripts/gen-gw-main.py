@@ -7,10 +7,9 @@ import matplotlib.pyplot as plt
 from scipy.special import sph_harm
 
 # File parameters
-folder_name = "gw_test"
-input_file = "/home/guest/Documents/bh_vis/scripts/Rpsi4_l2-r0100.0_strain.txt"
+input_file = "path"
 parent_directory = os.path.dirname(os.path.dirname(__file__))
-output_directory = "./gw_test12/"
+output_directory = "path"
 
 # Parameters
 numRadius = 450  # Number of points along the radius direction
@@ -120,13 +119,7 @@ for state, current_time in enumerate(h_time):
             target_time = time_0
         elif target_time > time_f:
             target_time = time_f
-        t_array[state][j] = target_time
-h_array = np.interp(t_array, h_time, h_strain)
-
-start_time = time.time()
-# Main Loop
-for state, current_time in enumerate(h_time):
-    if status_messages and state == 11:
+        t_array[state][j] = target_timefolder_name
         end_time = time.time()
         eta = (end_time - start_time) * length / 10
         print(
