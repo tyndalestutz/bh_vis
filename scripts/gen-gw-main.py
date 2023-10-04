@@ -1,17 +1,14 @@
-import vtk
-import os
-import math
-import time
+import os, math, time, vtk
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.special import sph_harm
 
 # File parameters
-input_file = "path"
+input_file = "./Rpsi4_l2-r0100.0.txt"
 parent_directory = os.path.dirname(os.path.dirname(__file__))
-output_directory = "path"
+output_directory = "./outputmeshstates"
+status_messages = True
 
-# Parameters
+# Plot parameters
 numRadius = 450  # Number of points along the radius direction
 numTheta = 180  # Number of points along the theta direction
 display_radius = 300  # Mesh radius
@@ -19,26 +16,20 @@ R_ext = 100  # Extraction radius
 l = 2
 m = 2
 s = -2
+scale_factor = 600
+omit_radius = 4
 plot_strain = True
 
 
 def set_sph_harm_array(l, m, s, radius_array, theta_array):
     # Initialize the spherical harmonic array
-    sph_harm_points = np.zeros(
-        (len(radius_array), len(theta_array)), dtype=np.complex128
-    )
+    sph_harm_points = np.zeros_like((radius_array, theta_array), dtype=np.complex128)
     phi = np.pi / 2  # phi is fixed to pi/2, similar to the original script
-    yspin = (-1) ** s * np.sqrt(
-        (2 * l + 1) / (4 * np.pi) * np.math.factorial(l - m) / np.math.factorial(l + m)
-    )
+    yspin = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * math.factorial(l - m) / math.factorial(l + m))
     # Loop over all points in the grid
     for j, radius in enumerate(radius_array):
         for i, theta in enumerate(theta_array):
-            # Calculate the radial and angular coordinates
-            # Calculate the spherical harmonic
             Y = yspin * sph_harm(m, l, theta, phi)
-            # Adjust for spin-weighted
-            # Store the spherical harmonic in the array
             sph_harm_points[j, i] = Y
     return sph_harm_points
 
@@ -57,17 +48,15 @@ def interpolated_strain(target_time, source_time, data):
 # Reads inputted strain data - returns data file row length, initial strain data (complex), and time values
 def initialize():
     if not os.path.exists(output_directory):
-        super_directory = os.path.dirname(output_directory)
-        if os.path.exists(super_directory):
+        answer = input(f"Directory: <{output_directory}> does not exist. Would you like to create it (Y/N) ")
+        if answer.capitalize() == "Y":
             os.makedirs(output_directory)
         else:
-            print(f"Error: {super_directory} does not exist.")
+            print("Exiting Program.")
             exit()
     else:
         if os.listdir(output_directory):
-            answer = input(
-                f"Data already exists at {output_directory}. Overwrite it? You cannot undo this action. (Y/N) "
-            )
+            answer = input(f"Data already exists at {output_directory}. Overwrite it? You cannot undo this action. (Y/N) ")
             if answer.capitalize() == "Y":
                 for file in os.listdir(output_directory):
                     os.remove(os.path.join(output_directory, file))
@@ -79,9 +68,7 @@ def initialize():
         return not line.startswith("#")
 
     with open(input_file, "r") as f:
-        strain_data = np.array(
-            [list(map(float, line.split())) for line in f if valid_line(line)]
-        )
+        strain_data = np.array([list(map(float, line.split())) for line in f if valid_line(line)])
 
     strain_data = np.unique(strain_data, axis=0)
     h_time, h_real, h_imag = strain_data[:, 0], strain_data[:, 1], strain_data[:, 2]
@@ -93,24 +80,19 @@ def initialize():
 
 
 length, h_strain, h_time = initialize()
-
-# Iterate over all points and construct mesh
-
 percentage = np.round(np.linspace(0, length, 101)).astype(int)
-scale_factor = 600
-status_messages = True
-omit_radius = 4
 
-# Pre-compute the theta and radius values outside the loop
+# Pre-compute the theta and radius values
 radius_values = np.linspace(0, display_radius, numRadius)
 theta_values = np.linspace(0, 2 * np.pi, numTheta, endpoint=False)
 rv, tv = np.meshgrid(radius_values, theta_values, indexing="ij")
 x_values = rv * np.cos(tv)
 y_values = rv * np.sin(tv)
 sph_harm_points = set_sph_harm_array(l, m, s, radius_values, theta_values)
+
+#generate and filter target times to pre-interpolate
 time_0 = np.min(h_time)
 time_f = np.max(h_time)
-
 t_array = np.zeros((len(h_time), len(radius_values)))
 for state, current_time in enumerate(h_time):
     for j, radius in enumerate(radius_values):
@@ -122,24 +104,16 @@ for state, current_time in enumerate(h_time):
         t_array[state][j] = target_time
 h_array = np.interp(t_array, h_time, h_strain)
 
+# Main Loop: Iterate over all points and construct mesh
 start_time = time.time()
-# Main Loop
 for state, current_time in enumerate(h_time):
     if status_messages and state == 11:
         end_time = time.time()
         eta = (end_time - start_time) * length / 10
-        print(
-            f"Creating {length} meshes and saving them to {output_directory}.\nEstimated time: {eta}"
-        )
+        print(f"Creating {length} meshes and saving them to {output_directory}.\nEstimated time: {eta}")
     if status_messages and state != 0 and np.isin(state, percentage):
         print(f" {int(state * 100 / (length - 1))}% done", end="\r")
-    """
-    # Change resolution at the specified time
-    if current_time >= change_time:
-        numTheta = new_numTheta
-        numRadius = new_numRadius
-        sph_harm_points = set_sph_harm_array(l, m, s, numTheta, numRadius, display_radius)
-    """
+
     # Create vtkUnstructuredGrid
     grid = vtk.vtkUnstructuredGrid()
 
@@ -185,10 +159,8 @@ for state, current_time in enumerate(h_time):
 
     # Set the cells in the vtkUnstructuredGrid
     grid.SetCells(vtk.VTK_QUAD, cellArray)
-
-    writer = (
-        vtk.vtkXMLUnstructuredGridWriter()
-    )  # vtk.vtkXMLPUnstructuredGridWriter() produces paralell files
+    # vtk.vtkXMLPUnstructuredGridWriter() produces parallel files
+    writer = (vtk.vtkXMLUnstructuredGridWriter())
     filename = output_directory + f"/state{state}.vtu"
     writer.SetFileName(filename)
     writer.SetInputData(grid)
