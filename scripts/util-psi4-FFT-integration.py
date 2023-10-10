@@ -106,9 +106,9 @@ def fit_quadratic_and_output_min_omega(time, omega):
     def quadratic(x, a, b, c):
         return a * x**2 + b * x + c
 
-    # Filter the data for t=100 to t=300
-    time_filtered = time[(time >= 100) & (time <= 300)]
-    omega_filtered = omega[(time >= 100) & (time <= 300)]
+    # Filter the data for t=200 to t=400. Note: non-pysical data at t=0 to t=120
+    time_filtered = time[(time >= 200) & (time <= 400)]
+    omega_filtered = omega[(time >= 200) & (time <= 400)]
 
     # Fit a quadratic curve to the omega data using nonlinear least squares
     params, _ = curve_fit(quadratic, time_filtered, omega_filtered)
@@ -192,7 +192,7 @@ def main():
         intg_dt2_real = np.real(intg_dt2_complex)
         intg_dt2_imag = np.imag(intg_dt2_complex)
 
-        output_file = output_directory + "Rpsi4_l_" + str(l_value) + "_m_" + str(m) + "-r0100.0.txt"
+        output_file = output_directory + "Psi4Strain_l_" + str(l_value) + "_m_" + str(m) + "-r0100.0.txt"
         with open(output_file, "w") as file:
             file.write("# Time    Second_Integral_Real    Second_Integral_Imag\n")
             for t, real, imag in zip(time, intg_dt2_real, intg_dt2_imag):
