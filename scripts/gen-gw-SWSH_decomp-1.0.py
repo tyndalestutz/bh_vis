@@ -1,3 +1,4 @@
+import numpy as np
 # Initialize an empty dictionary to store the strain data
 strain_data = {}
 

@@ -4,8 +4,7 @@ from scipy.special import sph_harm
 
 # File parameters
 input_file = "./Rpsi4_l2-r0100.0.txt"
-parent_directory = os.path.dirname(os.path.dirname(__file__))
-output_directory = "./outputmeshstates"
+output_directory = "./outputmeshstates/"
 status_messages = True
 
 # Plot parameters
@@ -23,7 +22,7 @@ plot_strain = True
 
 def set_sph_harm_array(l, m, s, radius_array, theta_array):
     # Initialize the spherical harmonic array
-    sph_harm_points = np.zeros_like((radius_array, theta_array), dtype=np.complex128)
+    sph_harm_points = np.zeros((len(radius_array), len(theta_array)), dtype=np.complex128)
     phi = np.pi / 2  # phi is fixed to pi/2, similar to the original script
     yspin = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * math.factorial(l - m) / math.factorial(l + m))
     # Loop over all points in the grid
@@ -88,7 +87,7 @@ theta_values = np.linspace(0, 2 * np.pi, numTheta, endpoint=False)
 rv, tv = np.meshgrid(radius_values, theta_values, indexing="ij")
 x_values = rv * np.cos(tv)
 y_values = rv * np.sin(tv)
-sph_harm_points = set_sph_harm_array(l, m, s, radius_values, theta_values)
+sph_array = set_sph_harm_array(l, m, s, radius_values, theta_values)
 
 #generate and filter target times to pre-interpolate
 time_0 = np.min(h_time)
@@ -107,10 +106,10 @@ h_array = np.interp(t_array, h_time, h_strain)
 # Main Loop: Iterate over all points and construct mesh
 start_time = time.time()
 for state, current_time in enumerate(h_time):
-    if status_messages and state == 11:
+    if status_messages and state == 10:
         end_time = time.time()
         eta = (end_time - start_time) * length / 10
-        print(f"Creating {length} meshes and saving them to {output_directory}.\nEstimated time: {eta}")
+        print(f"Creating {length} meshes and saving them to {output_directory}.\nEstimated time: {int(eta / 60)} minutes")
     if status_messages and state != 0 and np.isin(state, percentage):
         print(f" {int(state * 100 / (length - 1))}% done", end="\r")
 
@@ -131,7 +130,7 @@ for state, current_time in enumerate(h_time):
         for i, theta in enumerate(theta_values):
             x = x_values[j, i]
             y = y_values[j, i]
-            Y = sph_harm_points[j, i]
+            Y = sph_array[j, i]
             strain_value = Y.real * h_tR.real - Y.imag * h_tR.imag
             z = strain_value * scale_factor
             # Introduce a discontinuity to make room for the Black Holes
