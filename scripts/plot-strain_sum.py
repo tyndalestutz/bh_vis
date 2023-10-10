@@ -12,8 +12,8 @@ folder_name = "sum_test"
 parent_directory = os.path.dirname(os.path.dirname(__file__))
 output_directory = "/home/guest/Documents/Users/Tyndale/bh_repos/bhah_waveform_analysis/r0100.0/many_modes/"
 
-# Get a list of all files that begin with "Rpsi4"
-input_files = glob.glob("/home/guest/Documents/Users/Tyndale/bh_repos/bhah_waveform_analysis/r0100.0/many_modes/Rpsi4*")
+# Get a list of all files that begin with "Strain4"
+input_files = glob.glob("/home/guest/Documents/Users/Tyndale/bh_repos/bhah_waveform_analysis/r0100.0/many_modes/Strain4*")
 
 def valid_line(line):
     return not line.startswith("#")
@@ -52,10 +52,12 @@ data_modes.sort(key=lambda x: (x[1], x[2]))
 # Initialize sum_strain
 sum_strain = np.zeros_like(data_modes[0][0][:, 1])
 
+
 for data, l, m in data_modes:
     if m != 0:  # Exclude modes where m = 0
         sum_strain += np.real(data[:, 1])
 
+        
 h_time = data_modes[0][0][:, 0]
 
 # Define specific mode to plot
