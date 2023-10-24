@@ -22,7 +22,7 @@ plot_strain = True
 def set_sph_harm_array(l, m, s, radius_array, theta_array): #uses scipy.special sph_harm
     sph_harm_points = np.zeros((len(radius_array), len(theta_array)), dtype=np.complex128)
     phi = np.pi / 2  # phi is fixed to pi/2, why?
-    spin_weight = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * math.factorial(l - m) / math.factorial(l + m)) #why?
+    spin_weight = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * math.factorial(l - m) / math.factorial(l + m)) # why?
     for j, radius in enumerate(radius_array):
         for i, theta in enumerate(theta_array):
             sph_harm_points[j, i] = spin_weight * sph_harm(m, l, theta, phi)
@@ -84,6 +84,7 @@ for state, current_time in enumerate(h_time):
         t_array[state][j] = target_time
 h_array = np.interp(t_array, h_time, h_strain)
 
+# Intitialize vtk grid, points, data-array, grid cells, and writer
 grid = vtk.vtkUnstructuredGrid()
 points = vtk.vtkPoints()
 strain_array = vtk.vtkFloatArray()
@@ -108,13 +109,12 @@ for state, current_time in enumerate(h_time):
     if status_messages and state == 10:
         end_time = time.time()
         eta = (end_time - start_time) * length / 10
-        print(f"Creating {length} meshes and saving them to {output_directory}.\nEstimated time: {int(eta / 60)} minutes")
+        print(f"Creating {length} meshes and saving them to: {output_directory}\nEstimated time: {int(eta / 60)} minutes")
     if status_messages and state != 0 and np.isin(state, percentage):
         print(f" {int(state * 100 / (length - 1))}% done", end="\r")
 
-    points.Reset()
-
     # Define the points and their coordinates
+    points.Reset()
     index = 0
     for j, radius in enumerate(radius_values):
         h_tR = h_array[state][j]
@@ -122,12 +122,12 @@ for state, current_time in enumerate(h_time):
             x = x_values[j, i]
             y = y_values[j, i]
             S = sph_array[j, i]
-            strain_value = S.real * h_tR.real - S.imag * h_tR.imag
-            z = strain_value * scale_factor
-            # Introduce a discontinuity to make room for the Black Holes
-            if radius <= omit_radius:
+            if radius <= omit_radius: # Introduce a discontinuity to make room for the Black Holes
                 z = np.nan
                 strain_value = np.nan
+            else:
+                strain_value = S.real * h_tR.real - S.imag * h_tR.imag
+                z = strain_value * scale_factor
             points.InsertNextPoint(x, y, z)
             strain_array.SetTuple1(index, strain_value)
             index += 1
