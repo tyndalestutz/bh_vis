@@ -19,30 +19,14 @@ scale_factor = 600
 omit_radius = 4
 plot_strain = True
 
-
-def set_sph_harm_array(l, m, s, radius_array, theta_array):
-    # Initialize the spherical harmonic array
+def set_sph_harm_array(l, m, s, radius_array, theta_array): #uses scipy.special sph_harm
     sph_harm_points = np.zeros((len(radius_array), len(theta_array)), dtype=np.complex128)
-    phi = np.pi / 2  # phi is fixed to pi/2, similar to the original script
-    yspin = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * math.factorial(l - m) / math.factorial(l + m))
-    # Loop over all points in the grid
+    phi = np.pi / 2  # phi is fixed to pi/2, why?
+    spin_weight = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * math.factorial(l - m) / math.factorial(l + m)) #why?
     for j, radius in enumerate(radius_array):
         for i, theta in enumerate(theta_array):
-            Y = yspin * sph_harm(m, l, theta, phi)
-            sph_harm_points[j, i] = Y
+            sph_harm_points[j, i] = spin_weight * sph_harm(m, l, theta, phi)
     return sph_harm_points
-
-
-# Linearly interpolate strain for any given time
-def interpolated_strain(target_time, source_time, data):
-    if len(source_time) != len(data):
-        raise ValueError("source_time and data must have the same number of rows")
-    if not (np.diff(source_time) > 0).all():
-        raise ValueError("source_time must be strictly increasing")
-
-    interpolated_data = np.interp(target_time, source_time, data)
-    return interpolated_data
-
 
 # Reads inputted strain data - returns data file row length, initial strain data (complex), and time values
 def initialize():
@@ -63,18 +47,15 @@ def initialize():
                 print("Exiting Program. Change output directory to an empty directory.")
                 exit()
 
-    def valid_line(line):
-        return not line.startswith("#")
-
     with open(input_file, "r") as f:
-        strain_data = np.array([list(map(float, line.split())) for line in f if valid_line(line)])
+        strain_data = np.array([list(map(float, line.split())) for line in f if not(line.startswith("#"))])
 
     strain_data = np.unique(strain_data, axis=0)
+    length = len(strain_data)
     h_time, h_real, h_imag = strain_data[:, 0], strain_data[:, 1], strain_data[:, 2]
     h_strain = h_real + 1j * h_imag
-
-    length = len(h_strain)
-
+    if not (np.diff(h_time) > 0).all():
+        raise ValueError("h_time must be strictly increasing")
     return length, h_strain, h_time
 
 
@@ -92,7 +73,7 @@ sph_array = set_sph_harm_array(l, m, s, radius_values, theta_values)
 #generate and filter target times to pre-interpolate
 time_0 = np.min(h_time)
 time_f = np.max(h_time)
-t_array = np.zeros((len(h_time), len(radius_values)))
+t_array = np.zeros((length, numRadius))
 for state, current_time in enumerate(h_time):
     for j, radius in enumerate(radius_values):
         target_time = current_time - radius + R_ext
@@ -102,6 +83,24 @@ for state, current_time in enumerate(h_time):
             target_time = time_f
         t_array[state][j] = target_time
 h_array = np.interp(t_array, h_time, h_strain)
+
+grid = vtk.vtkUnstructuredGrid()
+points = vtk.vtkPoints()
+strain_array = vtk.vtkFloatArray()
+strain_array.SetName("Strain")
+strain_array.SetNumberOfComponents(1)
+strain_array.SetNumberOfTuples(numTheta * numRadius)
+cellArray = vtk.vtkCellArray()
+for j in range(numRadius - 1):
+    for i in range(numTheta):
+        cell = vtk.vtkQuad()
+        cell.GetPointIds().SetId(0, i + j * numTheta)
+        cell.GetPointIds().SetId(1, (i + 1) % numTheta + j * numTheta)
+        cell.GetPointIds().SetId(2, (i + 1) % numTheta + (j + 1) * numTheta)
+        cell.GetPointIds().SetId(3, i + (j + 1) * numTheta)
+        cellArray.InsertNextCell(cell)
+grid.SetCells(vtk.VTK_QUAD, cellArray)
+writer = (vtk.vtkXMLUnstructuredGridWriter())
 
 # Main Loop: Iterate over all points and construct mesh
 start_time = time.time()
@@ -113,25 +112,17 @@ for state, current_time in enumerate(h_time):
     if status_messages and state != 0 and np.isin(state, percentage):
         print(f" {int(state * 100 / (length - 1))}% done", end="\r")
 
-    # Create vtkUnstructuredGrid
-    grid = vtk.vtkUnstructuredGrid()
-
-    # Create strain data array
-    strain_array = vtk.vtkFloatArray()
-    strain_array.SetName("Strain")
-    strain_array.SetNumberOfComponents(1)
-    strain_array.SetNumberOfTuples(numTheta * numRadius)
+    points.Reset()
 
     # Define the points and their coordinates
-    points = vtk.vtkPoints()
     index = 0
     for j, radius in enumerate(radius_values):
         h_tR = h_array[state][j]
         for i, theta in enumerate(theta_values):
             x = x_values[j, i]
             y = y_values[j, i]
-            Y = sph_array[j, i]
-            strain_value = Y.real * h_tR.real - Y.imag * h_tR.imag
+            S = sph_array[j, i]
+            strain_value = S.real * h_tR.real - S.imag * h_tR.imag
             z = strain_value * scale_factor
             # Introduce a discontinuity to make room for the Black Holes
             if radius <= omit_radius:
@@ -141,26 +132,9 @@ for state, current_time in enumerate(h_time):
             strain_array.SetTuple1(index, strain_value)
             index += 1
 
-    # Set the points in the vtkUnstructuredGrid and strain_array
     grid.SetPoints(points)
     grid.GetPointData().AddArray(strain_array)
 
-    # Define the connectivity of the cells
-    cellArray = vtk.vtkCellArray()
-    for j in range(numRadius - 1):
-        for i in range(numTheta):
-            cell = vtk.vtkQuad()
-            cell.GetPointIds().SetId(0, i + j * numTheta)
-            cell.GetPointIds().SetId(1, (i + 1) % numTheta + j * numTheta)
-            cell.GetPointIds().SetId(2, (i + 1) % numTheta + (j + 1) * numTheta)
-            cell.GetPointIds().SetId(3, i + (j + 1) * numTheta)
-            cellArray.InsertNextCell(cell)
-
-    # Set the cells in the vtkUnstructuredGrid
-    grid.SetCells(vtk.VTK_QUAD, cellArray)
-    # vtk.vtkXMLPUnstructuredGridWriter() produces parallel files
-    writer = (vtk.vtkXMLUnstructuredGridWriter())
-    filename = output_directory + f"/state{state}.vtu"
-    writer.SetFileName(filename)
+    writer.SetFileName(output_directory + f"/state{state}.vtu")
     writer.SetInputData(grid)
     writer.Write()
