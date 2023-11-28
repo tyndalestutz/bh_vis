@@ -6,7 +6,7 @@ import numpy as np
 from scipy.special import sph_harm, factorial, comb, lpmv
 from scipy.optimize import curve_fit
 
-input_directory = r'C:\Users\sethw\OneDrive\PythonFiles\BHVisResearch\data\r100'
+input_directory = r'/home/guest/Documents/Users/Seth/bh_vis/scripts/data'
 
 
 # Plot parameters
@@ -20,9 +20,11 @@ s = -2
 scale_factor = 600
 omit_radius = 4
 plot_strain = True
-perform_integration = False
+perform_integration = True
 
 
+# This function is currently the most accurate with the Mathematica notebook I tested:
+# https://www.black-holes.org/SpinWeightedSphericalHarmonics.nb
 def spin_weight_sph_harm(l, m, s, theta, phi):
     """
     Finds spin weighted spherical harmonics for a given l, m, s, and array of theta values.
@@ -133,9 +135,10 @@ for l in l_vals:
             psi4_data[f's-imposed_theta{theta_pt}'][:, 1] += psi4_data[f'l{l}_m{m}_theta{theta_pt}'][:, 1]
             if theta_pt == 0:
                 print(f'added mode l={l}, m={m}')
-# NOTE: takes about 30 seconds to get to here, to organize psi4 data and multiply by spherical harmonics
 
 #print(list(psi4_data.keys()))
+
+# Temporary 2d animations in matplotlib for testing
 '''
 def update(frame):
     line.set_ydata(psi4_data[f'l2_m2_theta{frame}'][:, 1].real)
@@ -144,6 +147,8 @@ fig, ax = plt.subplots()
 line, = ax.plot(psi4_data['l2_m2_theta0'][:, 0], psi4_data['l2_m2_theta0'][:, 1].real)
 animation = FuncAnimation(fig, update, frames=range(180), interval=5)
 '''
+
+# Some notes to keep track of how swsh affects amplitudes
 '''
 l2m2: beginning peaks at 0.00015, ending peaks at 0.0035 - spherical harmonics reduces by a factor of 20
 l2m0: beginning peaks at 0.0001, ending peaks at 0.0002 - spherical harmonics reduces by a factor of 5
@@ -152,12 +157,14 @@ l6m0: beginning peaks at 0.0004, ending peaks at - spherical harmonics reduces b
 l8m0: beginning peaks at 0.0002, ending peaks at - spherical harmonics reduces by a factor of 2.7
 adding up all the modes should have a beginning peak no greater than 0.04 or so
 '''
-plt.plot(psi4_data['s-imposed_theta0'][:, 0].real, psi4_data['s-imposed_theta0'][:, 1].real, color = 'b', alpha=0.5)
+#plt.plot(psi4_data['s-imposed_theta0'][:, 0].real, psi4_data['s-imposed_theta0'][:, 1].real, color = 'b', alpha=0.5)
 #plt.plot(psi4_data['l2_m2_theta0'][:, 0].real, psi4_data['l2_m2_theta0'][:, 1].real, color='r', alpha=0.5)
 #plt.plot(psi4_data['l2_m2'][:, 0], psi4_data['l2_m2'][:, 1].real, color='b', alpha=0.5)
-plt.grid(True)
-plt.show()
+#plt.grid(True)
+#plt.show()
 print('Psi4 organizaion and spin-weighted spherical harmonic\n muliplication finished. Integrating...')
+
+
 '''
 Next: integrate n times for our n superimposed psi4 wave modes, corresponding to our n
 theta values varying in spin weighted spherical harmonics.
@@ -269,7 +276,7 @@ def main():
     and saves the output to a file. The input filename is provided via command line.
     """
 
-    output_directory = r'C:\Users\sethw\OneDrive\PythonFiles\BHVisResearch\data\r100\full_strain_swsh'
+    output_directory = '/home/guest/Documents/Users/Seth/bh_vis/scripts/r0100.0/S-imposed_strain'
 
     # NOTE: instead of reading file we pull from psi4 dictionary
 
@@ -300,7 +307,7 @@ def main():
 
 
 
-        output_file = output_directory + f"\S-imposed_strain_theta{theta_pt}-r0100.0.txt"
+        output_file = output_directory + f"/S-imposed_strain_theta{theta_pt}-r0100.0.txt"
         with open(output_file, "w") as file:
             file.write("# Time    Second_Integral_Real    Second_Integral_Imag\n")
             for t, real, imag in zip(time, intg_dt2_real, intg_dt2_imag):
