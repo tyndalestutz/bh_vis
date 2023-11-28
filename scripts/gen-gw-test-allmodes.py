@@ -5,6 +5,8 @@ from matplotlib.animation import FuncAnimation
 import numpy as np
 from scipy.special import sph_harm, factorial, comb, lpmv
 from scipy.optimize import curve_fit
+import spherical
+import quaternionic
 
 input_directory = r'/home/guest/Documents/Users/Seth/bh_vis/scripts/data'
 
@@ -14,13 +16,19 @@ num_radius_pts = 450
 num_theta_pts = 180
 display_radius = 300
 R_ext = 100
-l_vals = [2, 3, 4, 5, 6, 7, 8]
+ell_max = 8
+l_vals = range(2,ell_max+1)
 m = 2
 s = -2
 scale_factor = 600
 omit_radius = 4
 plot_strain = True
 perform_integration = True
+
+
+# Find Wigner matrix for every l from 1 to ell_max
+wigner = spherical.Wigner(ell_max)
+
 
 
 # This function is currently the most accurate with the Mathematica notebook I tested:
@@ -119,6 +127,10 @@ for theta_pt, theta_val in enumerate(theta_vals):
     #####psi4_data[f's-imposed_theta{theta_pt}'] = np.zeros((len(psi4_data[f'l{l_vals[0]}_m0'][:, 0]), 2), dtype=complex)
     psi4_data[f's-imposed_theta{theta_pt}'] = np.zeros((len(psi4_data[f'l{l_vals[0]}_m0'][:, 0]), 2), dtype=np.complex128)
     psi4_data[f's-imposed_theta{theta_pt}'][:, 0] = psi4_data[f'l{l_vals[0]}_m0'][:, 0]
+    psi4_data[f'strain_full_theta{theta_pt}'] = np.zeros((len(psi4_data[f'l{l_vals[0]}_m0'][:, 0]), 3))
+
+'''
+NOTE: uses old version of swsh
 for l in l_vals:
     for m in range(-l, l + 1):
         psi4_time = psi4_data[f'l{l}_m{m}'][:, 0]
@@ -135,18 +147,31 @@ for l in l_vals:
             psi4_data[f's-imposed_theta{theta_pt}'][:, 1] += psi4_data[f'l{l}_m{m}_theta{theta_pt}'][:, 1]
             if theta_pt == 0:
                 print(f'added mode l={l}, m={m}')
-
-#print(list(psi4_data.keys()))
-
-# Temporary 2d animations in matplotlib for testing
 '''
-def update(frame):
-    line.set_ydata(psi4_data[f'l2_m2_theta{frame}'][:, 1].real)
-    return line,
-fig, ax = plt.subplots()
-line, = ax.plot(psi4_data['l2_m2_theta0'][:, 0], psi4_data['l2_m2_theta0'][:, 1].real)
-animation = FuncAnimation(fig, update, frames=range(180), interval=5)
-'''
+
+# polar angle
+phi = np.pi/2
+#phi = 90
+#theta_vals_deg = np.degrees(theta_vals)
+for theta_pt, theta_val in enumerate(theta_vals):
+    R = quaternionic.array.from_spherical_coordinates(theta_val, phi)
+    #spin weighted spherical harmonics array
+    Y = wigner.sYlm(s, R)
+    for l in l_vals:
+        for m in range(-l, l + 1):
+            psi4_time = psi4_data[f'l{l}_m{m}'][:, 0]
+            swsh_index = l**2 + m + l # this index pulls from swsh array based off of current l, m
+            #s_factor = Y[swsh_index]
+            s_factor = Y[wigner.Yindex(l, m)]
+            psi4_real = psi4_data[f'l{l}_m{m}'][:, 1]
+            psi4_imag = psi4_data[f'l{l}_m{m}'][:, 2]
+            psi4_with_swsh = (psi4_real * s_factor.real - psi4_imag * s_factor.imag) + 1j * ((psi4_imag * s_factor.real) + (psi4_real * s_factor.imag))
+            
+            psi4_data[f'l{l}_m{m}_theta{theta_pt}'] = np.column_stack((psi4_time, psi4_with_swsh))
+            psi4_data[f's-imposed_theta{theta_pt}'][:, 1] += psi4_data[f'l{l}_m{m}_theta{theta_pt}'][:, 1]
+            if theta_pt == 0:
+                print(f'added mode l={l}, m={m}')
+
 
 # Some notes to keep track of how swsh affects amplitudes
 '''
@@ -157,11 +182,7 @@ l6m0: beginning peaks at 0.0004, ending peaks at - spherical harmonics reduces b
 l8m0: beginning peaks at 0.0002, ending peaks at - spherical harmonics reduces by a factor of 2.7
 adding up all the modes should have a beginning peak no greater than 0.04 or so
 '''
-#plt.plot(psi4_data['s-imposed_theta0'][:, 0].real, psi4_data['s-imposed_theta0'][:, 1].real, color = 'b', alpha=0.5)
-#plt.plot(psi4_data['l2_m2_theta0'][:, 0].real, psi4_data['l2_m2_theta0'][:, 1].real, color='r', alpha=0.5)
-#plt.plot(psi4_data['l2_m2'][:, 0], psi4_data['l2_m2'][:, 1].real, color='b', alpha=0.5)
-#plt.grid(True)
-#plt.show()
+
 print('Psi4 organizaion and spin-weighted spherical harmonic\n muliplication finished. Integrating...')
 
 
@@ -313,11 +334,32 @@ def main():
             for t, real, imag in zip(time, intg_dt2_real, intg_dt2_imag):
                 file.write(f"{t:.15f} {real:.15f} {imag:.15f}\n")
 
+        psi4_data[f'strain_full_theta{theta_pt}'][:, 0] = psi4_time
+        psi4_data[f'strain_full_theta{theta_pt}'][:, 1] = intg_dt2_real
+        psi4_data[f'strain_full_theta{theta_pt}'][:, 2] = intg_dt2_imag
+
+
+
         print(f"Second time integral data has been saved to {output_file}")
 
 
 if __name__ == "__main__" and perform_integration:
     main()
 
-    
+# Temporary 2d animations in matplotlib for testing
+'''
+fig, ax = plt.subplots()
+def update(frame):
+    line.set_ydata(psi4_data[f'strain_full_theta{frame}'][:, 1].real)
+    ax.set_title(f'theta point {frame}')
+    return line,
+line, = ax.plot(psi4_data['strain_full_theta0'][:, 0], psi4_data['strain_full_theta0'][:, 1].real)
+animation = FuncAnimation(fig, update, frames=range(180), interval=5)
 
+
+#plt.plot(psi4_data['s-imposed_theta0'][:, 0].real, psi4_data['s-imposed_theta0'][:, 1].real, color = 'b', alpha=0.5)
+#plt.plot(psi4_data['l2_m2_theta0'][:, 0].real, psi4_data['l2_m2_theta0'][:, 1].real, color='r', alpha=0.5)
+#plt.plot(psi4_data['l2_m2'][:, 0], psi4_data['l2_m2'][:, 1].real, color='b', alpha=0.5)
+plt.grid(True)
+plt.show()
+'''
