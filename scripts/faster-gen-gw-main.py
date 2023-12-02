@@ -1,15 +1,4 @@
-import os, math, time, vtk
-import numpy as np
-from scipy.special import sph_harm
-
-def set_sph_harm_array(l, m, s, radius_array, theta_array): #uses scipy.special sph_harm
-    sph_harm_points = np.zeros((len(radius_array), len(theta_array)), dtype=np.complex128)
-    phi = np.pi / 2  # phi is fixed to pi/2, why?
-    spin_weight = (-1) ** s * np.sqrt((2 * l + 1) / (4 * np.pi) * math.factorial(l - m) / math.factorial(l + m)) # why?
-    for j, radius in enumerate(radius_array):
-        for i, theta in enumerate(theta_array):
-            sph_harm_points[j, i] = spin_weight * sph_harm(m, l, theta, phi)
-    return sph_harm_points
+import os, time, vtk, numpy as np, quaternionic, spherical
 
 # Reads inputted strain data - returns data file row length, initial strain data (complex), and time values
 def initialize(input_file, output_directory):
@@ -43,8 +32,8 @@ def initialize(input_file, output_directory):
 
 def main():
     # File parameters
-    input_file = "./Rpsi4_l2-r0100.0.txt"
-    output_directory = "./outputmeshstates/"
+    input_file = "./r100/Rpsi4_l2-r0100.0.txt"
+    output_directory = "./new/outputmeshstates/"
     status_messages = True
 
     length, h_strain, h_time = initialize(input_file, output_directory)
@@ -54,21 +43,24 @@ def main():
     numTheta = 180  # Number of points per circle
     display_radius = 300  # Mesh radius
     R_ext = 100  # Extraction radius
+    s = -2
     l = 2
     m = 2
-    s = -2
     scale_factor = 600
     omit_radius = 4
-
+    ell_max = 8
+    D = spherical.Wigner(ell_max)
+    
     percentage = np.round(np.linspace(0, length, 101)).astype(int)
 
     # Pre-compute the theta and radius values
     radius_values = np.linspace(0, display_radius, numRadius)
-    theta_values = np.linspace(0, 2 * np.pi, numTheta, endpoint=False)
-    rv, tv = np.meshgrid(radius_values, theta_values, indexing="ij")
-    x_values = rv * np.cos(tv)
-    y_values = rv * np.sin(tv)
-    sph_array = set_sph_harm_array(l, m, s, radius_values, theta_values)
+    azimuth_values = np.linspace(0, 2 * np.pi, numTheta, endpoint=False)
+    colatitude = np.pi/2
+    rv, az = np.meshgrid(radius_values, azimuth_values, indexing="ij")
+    x_values = rv * np.cos(az)
+    y_values = rv * np.sin(az)
+    sY =  D.sYlm(s, quaternionic.array.from_spherical_coordinates(colatitude, azimuth_values))
 
     #generate and filter target times to pre-interpolate
     time_0 = np.min(h_time)
@@ -118,15 +110,15 @@ def main():
         index = 0
         for j, radius in enumerate(radius_values):
             h_tR = h_array[state][j]
-            for i, theta in enumerate(theta_values):
+            for i, azi in enumerate(azimuth_values):
                 x = x_values[j, i]
                 y = y_values[j, i]
-                S = sph_array[j, i]
+                swsh = sY[i][D.Yindex(l,m)]
                 if radius <= omit_radius: # Introduce a discontinuity to make room for the Black Holes
                     z = np.nan
                     strain_value = np.nan
                 else:
-                    strain_value = S.real * h_tR.real - S.imag * h_tR.imag
+                    strain_value = swsh.real * h_tR.real - swsh.imag * h_tR.imag
                     z = strain_value * scale_factor
                 points.InsertNextPoint(x, y, z)
                 strain_array.SetTuple1(index, strain_value)
@@ -134,7 +126,6 @@ def main():
 
         grid.SetPoints(points)
         grid.GetPointData().AddArray(strain_array)
-
         writer.SetFileName(output_directory + f"/state{state}.vtu")
         writer.SetInputData(grid)
         writer.Write()
