@@ -32,7 +32,7 @@ def initialize(input_file, output_directory):
 
 def main():
     # File parameters
-    input_file = "./r100/Rpsi4_l2-r0100.0.txt"
+    input_file = "./Rpsi4_l2-r0100.0_strain.txt"
     output_directory = "./new/outputmeshstates/"
     status_messages = True
 
