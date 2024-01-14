@@ -133,22 +133,23 @@ def main():
     sY =  D.sYlm(s, quaternionic.array.from_spherical_coordinates(colatitude, azimuth_values))
 
     time, mode_data = read_modes_data(input_dir,ell_max)
-    strain = np.zeros((len(time),num_azi_pts))
+    strain = np.empty((len(time), num_azi_pts),dtype=object)
+    weighted = np.empty((len(time), num_azi_pts),dtype=object)
     for idx_azi, azi in enumerate(azimuth_values):
-        weighted = 0
+        summation = 0
         for l in range(2, ell_max + 1):
             for m in range(-l, l + 1):
                 real, imag = mode_data[(l, m)]
                 cmplx = real + 1j * imag
                 swsh = sY[idx_azi][D.Yindex(l,m)]
-                weighted += cmplx * swsh
-
+                summation += cmplx * swsh
+        weighted[:,idx_azi] = summation
         # Fixed Frequency Integration
         fft_ang_freqs = np.fft.fftfreq(len(time), d = time[1] - time[0]) * 2 * np.pi
-        fft_result = np.fft.fft(weighted)
+        fft_result = np.fft.fft(summation)
 
-        _, _, phase_dt = process_wave_data(time, weighted)
-        omega_0 = fit_quadratic_and_output_min_omega(time, phase_dt)
+        _, _, phase_dt = process_wave_data(time, summation)
+        omega_0 = fit_quadratic_and_output_min_omega(time, phase_dt,t_end=400)
 
         # Just below Eq. 27 in https://arxiv.org/abs/1006.1632
         for idx_omg, omega in enumerate(fft_ang_freqs):
@@ -165,14 +166,14 @@ def main():
                 file.write(f"{t:.16g} {real:.16g} {imag:.16g}\n")
         print(f"Second time integral data has been saved to {output_file}")
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(time, strain[:,0])
-    plt.title('Strain vs Time')
-    plt.xlabel('Time')
-    plt.ylabel('Strain')
-    plt.grid(True)
-    plt.show()
-        
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(time, [np.real(x) for x in weighted[:,0] ])
+    # plt.plot(time, [-np.real(x) for x in strain[:,0] ])
+    # plt.title('psi4 vs Time')
+    # plt.xlabel('Time')
+    # plt.ylabel('sum psi4 weighted')
+    # plt.grid(True)
+    # plt.show()
     return strain
 
 if __name__ == "__main__":
