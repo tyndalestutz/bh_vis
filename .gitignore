@@ -1,2 +1,10 @@
 .vscode
 new/*
+scripts/gen-gw-main copy.py
+visit/r100/Rpsi4_l2-r0100.0.txt
+visit/r100/Rpsi4_l3-r0100.0.txt
+visit/r100/Rpsi4_l4-r0100.0.txt
+visit/r100/Rpsi4_l5-r0100.0.txt
+visit/r100/Rpsi4_l6-r0100.0.txt
+visit/r100/Rpsi4_l7-r0100.0.txt
+visit/r100/Rpsi4_l8-r0100.0.txt

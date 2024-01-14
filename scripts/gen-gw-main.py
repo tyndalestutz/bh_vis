@@ -62,7 +62,7 @@ def main():
     y_values = rv * np.sin(az)
     sY =  D.sYlm(s, quaternionic.array.from_spherical_coordinates(colatitude, azimuth_values))
 
-    #generate and filter target times to pre-interpolate
+    #generate and filter target times to pre-interpolate #Revisit
     time_0 = np.min(h_time)
     time_f = np.max(h_time)
     t_array = np.zeros((length, numRadius))
@@ -118,7 +118,8 @@ def main():
                     z = np.nan
                     strain_value = np.nan
                 else:
-                    strain_value = swsh.real * h_tR.real - swsh.imag * h_tR.imag
+                    strain_value = swsh.real * h_tR.real - swsh.imag * h_tR.imag #ignores imaginary cross-terms
+                    #strain_value = (swsh * h_tR).real
                     z = strain_value * scale_factor
                 points.InsertNextPoint(x, y, z)
                 strain_array.SetTuple1(index, strain_value)
