@@ -88,65 +88,59 @@ def frequency_cutoff_quad_fit(time, omega, t_start=200, t_end=400): # Revisit/Ro
     return omega_at_time_zero
 
 def psi4_fft_to_strain(input_dir="r100", output_dir="new", num_azi_pts=180, colatitude=np.pi/2, s=-2, ell_max=8):
-    if len(sys.argv) != 3:
-        print("Usage: python3 script.py <path to gw psi dir> <path to output directory>")
-        #sys.exit(1)
-        input_dir = "r100" # Defaults
-        output_dir = "new"
-    else:
-        input_dir = sys.argv[1]
-        output_dir = sys.argv[2]
-
     azimuth_values = np.linspace(0, 2 * np.pi, num_azi_pts, endpoint = False)
-
     D = spherical.Wigner(ell_max)
     sY =  D.sYlm(s, quaternionic.array.from_spherical_coordinates(colatitude, azimuth_values))
 
     time, mode_data = read_modes_data(input_dir,ell_max)
     strain = np.empty((len(time), num_azi_pts),dtype=object)
     weighted = np.empty((len(time), num_azi_pts),dtype=object)
+    strain_lm = {}
     #_, _, phase_dt = cumulative_phase_data(time, [r*i for r,i in mode_data[(2,2)]])
-    omega_0 = 0.05 #frequency_cutoff_quad_fit(time, phase_dt,t_end=400)
+    omega_22 = 0.05 #frequency_cutoff_quad_fit(time, phase_dt,t_end=400)
 
     plt.figure(figsize=(10, 6))
     plt.grid(True)
 
-    for idx_azi, azi in enumerate(azimuth_values):
+    for l in range(2, ell_max + 1):
+        for m in range(-l, l + 1):
+            if m==0:
+                continue
+            real, imag = mode_data[(l, m)]
+            cmplx = real + 1j * imag
+            # Fixed Frequency Integration, Eq. 27 in https://arxiv.org/abs/1006.1632
+            fft_ang_freqs = np.fft.fftfreq(len(time), d = time[1] - time[0]) * 2 * np.pi
+            fft_result = np.fft.fft(cmplx)
+            freq_cutoff = m * omega_22 / 2
+            for freq_idx, freq in enumerate(fft_ang_freqs):
+                if np.abs(freq) <= np.abs(freq_cutoff):
+                    fft_result[freq_idx] *= 1 / (1j * freq_cutoff)**2
+                else:
+                    fft_result[freq_idx] *= 1 / (1j * np.abs(freq))**2
+            strain_lm[(l,m)] = np.fft.ifft(fft_result)
+
+    for azi_idx, azi in enumerate(azimuth_values):
         summation = 0
         for l in range(2, ell_max + 1):
             for m in range(-l, l + 1):
-                # if m == 0 :
-                #     continue
-                real, imag = mode_data[(l, m)]
-                cmplx = real + 1j * imag
-                swsh = sY[idx_azi][D.Yindex(l,m)]
-                summation += cmplx * swsh
-        weighted[:,idx_azi] = summation
-        # Fixed Frequency Integration
-        fft_ang_freqs = np.fft.fftfreq(len(time), d = time[1] - time[0]) * 2 * np.pi
-        fft_result = np.fft.fft(summation)
-
-        # Just below Eq. 27 in https://arxiv.org/abs/1006.1632
-        for idx_omg, omega in enumerate(fft_ang_freqs):
-            if np.abs(omega) <= omega_0:
-                fft_result[idx_omg] *= 1 / (1j * omega_0)**2
-            else:
-                fft_result[idx_omg] *= 1 / (1j * np.abs(omega))**2
-
-        strain[:,idx_azi] = np.fft.ifft(fft_result)
-
+                if m==0:
+                    continue
+                swsh = sY[azi_idx][D.Yindex(l,m)]
+                summation += strain_lm[(l,m)] * swsh
+        strain[:,azi_idx] = summation
         output_file = f"{output_dir}/Strain_azi_{azi/np.pi:.2f}pi_r0100.txt"
         with open(output_file, "w") as file:
             file.write("# Time    Strain_Real    Strain_Imag\n")
-            for t, real, imag in zip(time, np.real(strain[:,idx_azi]), np.imag(strain[:,idx_azi])):
+            for t, real, imag in zip(time, np.real(strain[:,azi_idx]), np.imag(strain[:,azi_idx])):
                 file.write(f"{t:.16g} {real:.16g} {imag:.16g}\n")
         #print(f"Second time integral data has been saved to {output_file}")
 
-    #idx_azi = 0
-    #plt.plot(time, [np.real(x) for x in weighted[:,idx_azi] ])
-    #plt.plot(time, [np.real(x) for x in strain[:,idx_azi] ])
-    #plt.show()
+    azi_idx = 0
+    #plt.plot(time, [np.real(x) for x in weighted[:,azi_idx] ])
+    plt.plot(time, [np.real(x) for x in strain[:,azi_idx] ])
+    plt.show()
     return strain
 
 if __name__ == "__main__":
     psi4_fft_to_strain()
+    #print("Usage: python3 script.py <path to gw psi dir> <path to output directory>")
