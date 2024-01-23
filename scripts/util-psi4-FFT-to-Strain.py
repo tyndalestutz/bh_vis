@@ -107,7 +107,8 @@ def fit_quadratic_and_output_min_omega(time, omega, t_start=200, t_end=400): # R
     omega_at_time_zero = np.abs(c)
 
     #print(f"The extremum of the quadratic curve occurs at t = {extremum_x:.15f} with omega = {extremum_y:.15f} . implied omega(t=0) = {omega_at_time_zero:.15f}")
-    return omega_at_time_zero
+    #print(f"c = {omega_at_time_zero:.4g}")
+    return 1 #omega_at_time_zero
 
 def main():
     """
@@ -135,6 +136,13 @@ def main():
     time, mode_data = read_modes_data(input_dir,ell_max)
     strain = np.empty((len(time), num_azi_pts),dtype=object)
     weighted = np.empty((len(time), num_azi_pts),dtype=object)
+
+    # plt.figure(figsize=(10, 6))
+    # plt.title('psi4 vs Time')
+    # plt.xlabel('Time')
+    # plt.ylabel('sum psi4 weighted')
+    # plt.grid(True)
+
     for idx_azi, azi in enumerate(azimuth_values):
         summation = 0
         for l in range(2, ell_max + 1):
@@ -159,21 +167,19 @@ def main():
                 fft_result[idx_omg] *= 1 / (1j * np.abs(omega))**2
 
         strain[:,idx_azi] = np.fft.ifft(fft_result)
+
         output_file = f"{output_dir}/Strain_azi_{azi/np.pi:.2f}pi_r0100.txt"
         with open(output_file, "w") as file:
             file.write("# Time    Strain_Real    Strain_Imag\n")
             for t, real, imag in zip(time, np.real(strain[:,idx_azi]), np.imag(strain[:,idx_azi])):
                 file.write(f"{t:.16g} {real:.16g} {imag:.16g}\n")
-        print(f"Second time integral data has been saved to {output_file}")
+        #print(f"Second time integral data has been saved to {output_file}")
 
-    # plt.figure(figsize=(10, 6))
-    # plt.plot(time, [np.real(x) for x in weighted[:,0] ])
-    # plt.plot(time, [-np.real(x) for x in strain[:,0] ])
-    # plt.title('psi4 vs Time')
-    # plt.xlabel('Time')
-    # plt.ylabel('sum psi4 weighted')
-    # plt.grid(True)
-    # plt.show()
+
+
+    #plt.plot(time, [-np.real(x) for x in weighted[:,idx_azi] ])
+        plt.plot(time, [np.real(x) for x in strain[:,idx_azi] ])
+    plt.show()
     return strain
 
 if __name__ == "__main__":
