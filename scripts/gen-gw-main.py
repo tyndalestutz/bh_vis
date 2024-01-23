@@ -33,7 +33,7 @@ def initialize(input_file, output_directory):
 def main():
     # File parameters
     input_file = "./Rpsi4_l2-r0100.0_strain.txt"
-    output_directory = "./new/outputmeshstates/"
+    output_directory = "./new/outputmeshstates-l2m2/"
     status_messages = True
 
     length, h_strain, h_time = initialize(input_file, output_directory)

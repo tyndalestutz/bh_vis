@@ -8,7 +8,7 @@ from scipy.optimize import curve_fit
 import spherical
 import quaternionic
 
-input_directory = r'/home/guest/Documents/Users/Seth/bh_vis/scripts/data'
+input_directory = r'/home/guest/Documents/Users/Seth/bh_vis/scripts/r0100.0'
 
 
 # Plot parameters
@@ -154,7 +154,7 @@ phi = np.pi/2
 #phi = 90
 #theta_vals_deg = np.degrees(theta_vals)
 for theta_pt, theta_val in enumerate(theta_vals):
-    R = quaternionic.array.from_spherical_coordinates(theta_val, phi)
+    R = quaternionic.array.from_spherical_coordinates(phi, theta_val)
     #spin weighted spherical harmonics array
     Y = wigner.sYlm(s, R)
     for l in l_vals:
@@ -347,14 +347,15 @@ if __name__ == "__main__" and perform_integration:
     main()
 
 # Temporary 2d animations in matplotlib for testing
-'''
+
 fig, ax = plt.subplots()
 def update(frame):
     line.set_ydata(psi4_data[f'strain_full_theta{frame}'][:, 1].real)
     ax.set_title(f'theta point {frame}')
+    time.sleep(0.05)
     return line,
 line, = ax.plot(psi4_data['strain_full_theta0'][:, 0], psi4_data['strain_full_theta0'][:, 1].real)
-animation = FuncAnimation(fig, update, frames=range(180), interval=5)
+animation = FuncAnimation(fig, update, frames=range(720), interval=1)
 
 
 #plt.plot(psi4_data['s-imposed_theta0'][:, 0].real, psi4_data['s-imposed_theta0'][:, 1].real, color = 'b', alpha=0.5)
@@ -362,4 +363,4 @@ animation = FuncAnimation(fig, update, frames=range(180), interval=5)
 #plt.plot(psi4_data['l2_m2'][:, 0], psi4_data['l2_m2'][:, 1].real, color='b', alpha=0.5)
 plt.grid(True)
 plt.show()
-'''
+
