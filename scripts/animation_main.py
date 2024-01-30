@@ -20,16 +20,16 @@ v = visit
 def main():
     ##### File names #####
     parent_directory = os.path.dirname(os.path.dirname(__file__))
-    bh_database = "/home/guest/Documents/BH_Vis/data/mesh/spheres/iscos_sphere_sub8.obj"
-    gw_database = "/home/guest/Documents/BH_Vis/data/mesh/synth_gw/test15/state*.vts database"
-    bh_data = "/home/guest/Documents/BH_Vis/data/synthetic_coords/synthetic_data_ang_momentum.csv"
+    bh_database = os.path.join(parent_directory, "data", "dummy", "h.t277632.ah2_state0.obj")
+    gw_database = os.path.join(parent_directory, "data", "dummy", "gw_dummy", "state*.vtu database")
+    bh_data = os.path.join(parent_directory, "data", "dummy", "bh_xyz_dummy.csv")
     movie_output_destination = parent_directory + "/movies/movie2"
 
     ##### Parameters #####
     record_render = False
 
     ##### Initialize Objects #####
-    default_atts()
+    default_atts(movie_output_destination)
     create_sphere(bh_database) # Black hole 1
     create_sphere(bh_database) # Black hole 2
     create_gw(gw_database) # Gravitational wave
