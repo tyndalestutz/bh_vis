@@ -1,0 +1,81 @@
+directories:
+  parent_directory: /your/parent/directory/path
+  bh_database: /home/guest/data/horizon_data_obj/h.t277632.ah2_state0.obj
+  bh_data: /home/guest/Documents/bh_vis/scripts/sorted.csv
+  gw_database: /home/guest/Documents/BH_Vis_local/data/mesh/gw_test8_polar_zeroR_r=200/state*.vtu database
+
+parameters:
+  record_render: false
+  green_screen: false
+  show_axis_annotations: false
+
+RenderingAtts:
+  specularFlag: 1
+  specularCoeff: 0.13
+  specularPower: 3.2
+  specularColor: [255, 255, 255, 255]
+
+View3DAtts:
+  viewNormal: [0, 0, 1]
+  focus: [0, 0, 0]
+  viewUp: [0, 1, 0]
+  nearPlane: -28.4429
+  farPlane: 28.4429
+  windowValid: 1
+
+AnnotationAttributes:
+  axes2D.visible: 0
+  axes3D.visible: 0
+  axes3D.triadFlag: 0
+  axes3D.bboxFlag: 0
+  axes3D.xAxis.grid: 0
+  axes3D.yAxis.grid: 0
+  axes3D.zAxis.grid: 0
+  axes3D.triadLineWidth: 0
+  userInfoFlag: 0
+  databaseInfoFlag: 0
+  legendInfoFlag: 0
+  axesArray: [0, 0, 0]
+  backgroundColor: [128, 128, 128, 255]
+  foregroundColor: [255, 255, 255, 255]
+  gradientBackgroundStyle: 1
+  gradientColor1: [80, 80, 80, 255]
+  gradientColor2: [70, 70, 70, 255]
+  imageRepeatX: 1
+  imageRepeatY: 1
+  special:
+    backgroundMode: Solid
+
+BHPseudocolorAtts:
+  minFlag: 1
+  min: -0.1
+  useBelowMinColor: 1
+  belowMinColor: [31, 31, 31, 255]
+  maxFlag: 1
+  max: 0.1
+  useAboveMaxColor: 1
+  aboveMaxColor: [0, 255, 0, 255]
+
+GWPseudocolorAtts:
+  min: -10
+  maxFlag: 1
+  max: 10
+  colorTableName: viridis_light
+  invertColorTable: 0
+  pointSizeVarEnabled: 0
+  pointSizeVar: default
+  pointSizePixels: 2
+  lineWidth: 0
+  renderSurfaces: 1
+  renderWireframe: 0
+  renderPoints: 0
+  smoothingLevel: 0
+  legendFlag: 1
+  lightingFlag: 1
+  special:
+    scaling: Linear
+    limitsMode: OriginalData
+    lineType: Line
+    pointType: Point
+    opacityType: FullyOpaque
+    centering: Nodal
