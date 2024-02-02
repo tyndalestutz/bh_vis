@@ -7,7 +7,7 @@ the black holes, gravitational wave, and angular momentum vector objects, then
 animates the collision. If record_render is set to True, it will save the frames of
 the animation to the movie_output_destination directory, which will then be combined
 into a movie.
-
+ 
 """
 
 import sys, csv, os
