@@ -11,6 +11,7 @@ Author: Zachariah B. Etienne
         zachetie **at** gmail **dot* com
 """
 import sys
+import os
 from typing import Tuple, Dict
 
 import numpy as np
@@ -54,8 +55,11 @@ def read_BHaH_psi4_files(
     time_data_size: int = -1
     for ell in range(2, 9):
         file_name = generic_file_name.replace("[MODENUM]", str(ell))
+        file_path = os.path.abspath(
+            os.path.join(__file__, '..', '..', "r100", file_name)
+        )
         print(f"Reading file {file_name}...")
-        with open(file_name, mode="r", encoding="utf-8") as file:
+        with open(file_path, mode="r", encoding="utf-8") as file:
             # Read the lines and ignore lines starting with '#'
             lines = [line for line in file.readlines() if not line.startswith("#")]
 
@@ -317,8 +321,10 @@ def extract_min_omega_ell2_m2(
     phase_amp_omega_file = (
         f"Rpsi4_r{extraction_radius:06.1f}_ell2_m2_phase_amp_omega.txt"
     )
-
-    with open(phase_amp_omega_file, mode="w", encoding="utf-8") as file:
+    paof_file_path = os.path.abspath(
+        os.path.join(__file__, '..', '..', "r100", phase_amp_omega_file)
+    )
+    with open(paof_file_path, mode="w", encoding="utf-8") as file:
         file.write("# Time    cumulative_phase    amplitude    omega\n")
         for t, cp, a, o in zip(
             time_arr, cumulative_phase_ell2_m2, amplitude_ell2_m2, omega_ell2_m2
@@ -408,7 +414,10 @@ def main() -> None:
     for ell in range(2, 9):
         # Save the strain output to a file with _conv_to_strain.txt extension
         strain_file = f"Rpsi4_r{extraction_radius:06.1f}_l{ell}_conv_to_strain.txt"
-        with open(strain_file, mode="w", encoding="utf-8") as file:
+        strain_file_path = os.path.abspath(
+            os.path.join(__file__, '..', '..', "r100", strain_file)
+        )
+        with open(strain_file_path, mode="w", encoding="utf-8") as file:
             column = 1
             file.write(f"# column {column}: t-R_ext = [retarded time]\n")
             column += 1
@@ -428,7 +437,10 @@ def main() -> None:
 
         # Save the strain->psi4 output to a file with _from_strain.txt extension
         ddot_file = f"Rpsi4_r{extraction_radius:06.1f}_l{ell}_from_strain.txt"
-        with open(ddot_file, mode="w", encoding="utf-8") as file:
+        ddot_file_path = os.path.abspath(
+            os.path.join(__file__, '..', '..', "r100", ddot_file)
+        )
+        with open(ddot_file_path, mode="w", encoding="utf-8") as file:
             column = 1
             file.write(f"# column {column}: t-R_ext = [retarded time]\n")
             column += 1

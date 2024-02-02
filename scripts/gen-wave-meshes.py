@@ -5,11 +5,14 @@ the modes and casts them to 3D using linear interpolation and
 spin-weighted spherical harmonic factors. The modes are superimpoed
 in the final mesh to recreate the full waveform.
 """
-
-import os, vtk
+import sys
+import os
 import time
+import vtk
 import numpy as np
-import quaternionic, spherical
+import quaternionic
+import spherical
+
 
 def read_strain_files(file_path):
     """
@@ -17,22 +20,21 @@ def read_strain_files(file_path):
     for a specific l mode. Returns the time states and mode data in an easily retrievable format.
 
     :param file_path: Path to the file to be read.
-    :return: A tuple containing the time (numpy array) and a dictionary with keys (l, m) containingth the data.
-    :raises ValueError: if the length of the time data is inconsistent across different ell values.  
+    :return: A tuple containing the time (numpy array) 
+             and a dictionary with keys (l, m) containing the data.
+    :raises ValueError: if the length of the time data is inconsistent across different ell values.
     """
     mode_data = {}
     time_data_size = -1
     for ell in range(2, 9):
         file_name = file_path.replace("[ELLVAL]", str(ell))
-        with open(file_name, "r") as file:
+        with open(file_name, "r", encoding="utf-8") as file:
             # Read lines that don't start with '#'
             print(file_name)
             lines = [line for line in file.readlines() if not line.startswith("#")]
-    
+
         # Convert lines to arrays and sort by time
-        data = np.array(
-            [list(map(np.float64, line.split())) for line in lines]
-        )
+        data = np.array([list(map(np.float64, line.split())) for line in lines])
         data = data[np.argsort(data[:, 0])]
 
         # Remove duplicate times
@@ -45,34 +47,37 @@ def read_strain_files(file_path):
             time_data_size = len(time_data)
         elif time_data_size != len(time_data):
             raise ValueError(
-                f"Inconsistent time data size for ell={ell}. Expected {time_data_size}, got {len(time_data)}."
+                f"""Inconsistent time data size for ell={ell}. 
+                Expected {time_data_size}, got {len(time_data)}."""
             )
-        
+
         # Loop through columns and store real and imaginary parts in dictionary
         for em in range(-ell, ell + 1):
-            index = 1 + 2 * (em + ell) # the index for the real valued strain
+            index = 1 + 2 * (em + ell)  # the index for the real valued strain
             mode_data[(ell, em)] = data[:, index] + 1j * data[:, index + 1]
 
     return time_data, mode_data
+
 
 def find_swsh_factor(colat, azi, ell, em):
     """
     Calculates the complex valued spin-weighted spherical harmonic (SWSH) factors to be
     multiplied with strain. Uses spherical package to find the factor and the inputted
     colatitude, azimuthal, l, and m values, and a physically defined spin = -2 value.
-    
+
     :param colat: colatitude angle for the SWSH factor
     :param azi: azimuthal angle for the SWSH factor
     :param ell: wave mode value l
     :param em: wave mode value m
-    :return: a complex valued spin-weighted spherical harmonic factor 
+    :return: a complex valued spin-weighted spherical harmonic factor
     """
     s = -2
     R = quaternionic.array.from_spherical_coordinates(colat, azi)
-    winger = spherical.Wigner(8) # Create a Winger matrix for all modes from l=2 to l=8
+    winger = spherical.Wigner(8)  # Create a Winger matrix for all modes from l=2 to l=8
     Y = winger.sYlm(s, R)
     swsh_factor = Y[winger.Yindex(ell, em)]
     return swsh_factor
+
 
 def superimpose_modes_from_angle(colat, azi, num_time_states, mode_data):
     """
@@ -85,13 +90,14 @@ def superimpose_modes_from_angle(colat, azi, num_time_states, mode_data):
     :param mode_data: dictionary containing strain data for all the modes
     :return: a complex valued numpy array of the superimposed wave
     """
-    summation = np.zeros(num_time_states, dtype='complex128')
+    summation = np.zeros(num_time_states, dtype="complex128")
     for ell in range(2, 9):
         for em in range(-ell, ell + 1):
             swsh_factor = find_swsh_factor(colat, azi, ell, em)
             factored_strain = mode_data[(ell, em)] * swsh_factor
             summation += factored_strain
     return summation
+
 
 def generate_interpolation_points(time_array, radius_values, r_ext):
     """
@@ -118,7 +124,8 @@ def generate_interpolation_points(time_array, radius_values, r_ext):
                 target_time = time_f
             target_times[state][j] = target_time
     return target_times
-    
+
+
 def initialize_vtk_grid(num_azi, num_radius):
     """
     Sets initial parameters for the mesh generation module and returns
@@ -127,8 +134,8 @@ def initialize_vtk_grid(num_azi, num_radius):
     :param num_azi: number of azimuthal points on the mesh
     :param num_radius: number of radial points on the mesh
     :returns: vtk.vtkFloatArray(),
-              vtk.vtkUnstructuredGrid(), 
-              vtk.vtkPoints(), 
+              vtk.vtkUnstructuredGrid(),
+              vtk.vtkPoints(),
               vtk.vtkXMLUnstructuredGridWriter()
     """
     grid = vtk.vtkUnstructuredGrid()
@@ -137,7 +144,7 @@ def initialize_vtk_grid(num_azi, num_radius):
     strain_array.SetName("Strain")
     strain_array.SetNumberOfComponents(1)
     strain_array.SetNumberOfTuples(num_azi * num_radius)
-    cellArray = vtk.vtkCellArray()
+    cell_array = vtk.vtkCellArray()
     for j in range(num_radius - 1):
         for i in range(num_azi):
             cell = vtk.vtkQuad()
@@ -145,44 +152,56 @@ def initialize_vtk_grid(num_azi, num_radius):
             cell.GetPointIds().SetId(1, (i + 1) % num_azi + j * num_azi)
             cell.GetPointIds().SetId(2, (i + 1) % num_azi + (j + 1) * num_azi)
             cell.GetPointIds().SetId(3, i + (j + 1) * num_azi)
-            cellArray.InsertNextCell(cell)
-    grid.SetCells(vtk.VTK_QUAD, cellArray)
-    writer = (vtk.vtkXMLUnstructuredGridWriter())
+            cell_array.InsertNextCell(cell)
+    grid.SetCells(vtk.VTK_QUAD, cell_array)
+    writer = vtk.vtkXMLUnstructuredGridWriter()
     return strain_array, grid, points, writer
-    
 
-#######################################
 
 def main():
     """
-    Main function that reads the strain data, calculates and factors in spin-weighted spherical harmonics,
-    linearly interpolates the strain to fit the mesh points, and creates .vtu mesh file for each time state
-    of the simulation. The meshes represent the full superimposed waveform at the polar angle pi/2,
+    Main function that reads the strain data, 
+    calculates and factors in spin-weighted spherical harmonics,
+    linearly interpolates the strain to fit the mesh points, 
+    and creates .vtu mesh file for each time state of the simulation. 
+    The meshes represent the full superimposed waveform at the polar angle pi/2,
     aka the same plane as the binary black hole merger.
     """
-    generic_file_path = r"C:\Users\sethw\OneDrive\PythonFiles\BHVisResearch\r100\Rpsi4_r0100.0_l[ELLVAL]_conv_to_strain.txt"
-    output_directory = "./new/meshstates"
+
+    # change this when data leaves repo
+    input_file_name = "Rpsi4_r0100.0_l[ELLVAL]_conv_to_strain.txt"
+    input_file_path = os.path.abspath(
+        os.path.join(__file__, "..", "..", "r100", input_file_name)
+    )
+    output_directory = os.path.abspath(
+        os.path.join(__file__, "..", "..", "r100", "new", "meshstates")
+    )
     status_messages = True
 
     # check output directory
     if not os.path.exists(output_directory):
-        answer = input(f"Directory: <{output_directory}> does not exist. Would you like to create it (Y/N) ")
+        answer = input(
+            f"Directory: <{output_directory}> does not exist. Would you like to create it (Y/N) "
+        )
         if answer.capitalize() == "Y":
             os.makedirs(output_directory)
         else:
             print("Exiting Program.")
-            exit()
+            sys.exit()
     else:
         if os.listdir(output_directory):
-            answer = input(f"Data already exists at {output_directory}. Overwrite it? You cannot undo this action. (Y/N) ")
+            answer = input(
+                f"""Data already exists at {output_directory}. 
+                Overwrite it? You cannot undo this action. (Y/N) """
+            )
             if answer.capitalize() == "Y":
                 for file in os.listdir(output_directory):
                     os.remove(os.path.join(output_directory, file))
             else:
                 print("Exiting Program. Change output directory to an empty directory.")
-                exit()
+                sys.exit()
 
-    time_array, mode_data = read_strain_files(generic_file_path)
+    time_array, mode_data = read_strain_files(input_file_path)
     print(mode_data.keys())
     num_time_states = len(time_array)
 
@@ -193,7 +212,7 @@ def main():
     R_extraction = 100
     amplitude_scale_factor = 600
     omitted_radius_length = 4
-    colat = np.pi/2 # colatitude angle representative of the plane of merger
+    colat = np.pi / 2  # colatitude angle representative of the plane of merger
 
     # Pre-compute theta and radius values for the mesh
     radius_values = np.linspace(0, display_radius, num_radius_points)
@@ -201,27 +220,39 @@ def main():
     rv, az = np.meshgrid(radius_values, azimuth_values, indexing="ij")
     x_values = rv * np.cos(az)
     y_values = rv * np.sin(az)
-    
-    strain_to_mesh = {} # Holds the final strain points indexed [azimuthal point (key)][time state][radius]
-    
+
+    strain_to_mesh = (
+        {}
+    )  # Holds the final strain points indexed [azimuthal point (key)][time state][radius]
+
     # Apply spin-weighted spherical harmonics, superimpose modes, and interpolate to mesh points
-    interpolation_times = generate_interpolation_points(time_array, radius_values, R_extraction)
+    interpolation_times = generate_interpolation_points(
+        time_array, radius_values, R_extraction
+    )
     for azi_index, azi in enumerate(azimuth_values):
-        superimposed_strain = superimpose_modes_from_angle(colat, azi, num_time_states, mode_data)
-        strain_to_mesh[azi_index] = np.interp(interpolation_times, time_array, superimposed_strain)
-    
+        superimposed_strain = superimpose_modes_from_angle(
+            colat, azi, num_time_states, mode_data
+        )
+        strain_to_mesh[azi_index] = np.interp(
+            interpolation_times, time_array, superimposed_strain
+        )
 
     # -----Main Loop: Iterate over all points and construct mesh
-    
-    strain_array, grid, points, writer = initialize_vtk_grid(num_azi_points, num_radius_points)
+
+    strain_array, grid, points, writer = initialize_vtk_grid(
+        num_azi_points, num_radius_points
+    )
     start_time = time.time()
     percentage = np.round(np.linspace(0, num_time_states, 101)).astype(int)
 
-    for state, current_time in enumerate(time_array):
+    for state, _ in enumerate(time_array):
         if status_messages and state == 10:
             end_time = time.time()
             eta = (end_time - start_time) * num_time_states / 10
-            print(f"Creating {num_time_states} meshes and saving them to: {output_directory}\nEstimated time: {int(eta / 60)} minutes")
+            print(
+                f"""Creating {num_time_states} meshes and saving them to: 
+                {output_directory}\nEstimated time: {int(eta / 60)} minutes"""
+            )
         if status_messages and state != 0 and np.isin(state, percentage):
             print(f" {int(state * 100 / (num_time_states - 1))}% done", end="\r")
 
@@ -233,7 +264,9 @@ def main():
                 h_tR = strain_to_mesh[i][state][j]
                 x = x_values[j, i]
                 y = y_values[j, i]
-                if radius <= omitted_radius_length: # Introduce a discontinuity to make room for the Black Holes
+                if (
+                    radius <= omitted_radius_length
+                ):  # Introduce a discontinuity to make room for the Black Holes
                     z = np.nan
                     strain_value = np.nan
                 else:
@@ -245,9 +278,12 @@ def main():
 
         grid.SetPoints(points)
         grid.GetPointData().AddArray(strain_array)
-        writer.SetFileName(output_directory + f"/state{state}.vtu")
+        writer.SetFileName(
+            os.path.join(output_directory, f"state{state}.vtu")
+        )
         writer.SetInputData(grid)
         writer.Write()
+
 
 if __name__ == "__main__":
     main()
