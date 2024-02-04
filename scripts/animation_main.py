@@ -19,6 +19,7 @@ import visit
 
 visit.Launch()
 import visit
+import os
 
 v = visit
 
@@ -26,35 +27,51 @@ v = visit
 # Main function
 def main():
     ##### File names #####
-    parent_directory = os.path.dirname(os.path.dirname(__file__))
-    bh_database = os.path.join(
-        parent_directory, "..", "data", "dummy", "h.t277632.ah2_state0.obj"
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    
+    sphere_object = os.path.join(
+        script_directory, "..", "data", "sphere.obj" # This path should stay the same
     )
     gw_database = os.path.join(
-        parent_directory, "..", "data", "dummy", "gw_dummy", "state*.vtu database"
+        "/shared", "data", "dummy", "gw_dummy", "state*.vtu database"
     )
-    bh_data = os.path.join(parent_directory, "..", "data", "dummy", "bh_xyz_dummy.csv")
+    bh_data = os.path.join(
+        "/shared", "data", "dummy", "bh_xyz_dummy.csv"
+    )
     movie_output_destination = os.path.join(
-        parent_directory, "..", "/movies/dummy"
+        script_directory, "../../movies/dummy"
     )
+    
+    #create the movie_output_destination directory if it doesn't exist
+    if not os.path.exists(movie_output_destination):
+        os.makedirs(movie_output_destination)
 
     ##### Parameters #####
-    record_render = False
+    record_render = True
+    show_angular_momentum_vectors = True
 
     ##### Initialize Objects #####
-    default_atts(movie_output_destination)
-    create_sphere(bh_database)  # Black hole 1
-    create_sphere(bh_database)  # Black hole 2
+    default_atts()
+    set_view(
+        view_normal = (-0.188008, -0.842775, 0.504363), 
+        view_up = (0.00633342, 0.51247, 0.858682), 
+        zoom = 15, 
+        collat_angle = 30
+    )
+    create_sphere(sphere_object)  # Black hole 1
+    create_sphere(sphere_object)  # Black hole 2
     create_gw(gw_database)  # Gravitational wave
-    L1 = create_vector()
-    L2 = create_vector()
+    if show_angular_momentum_vectors:
+        L1 = create_vector()
+        L2 = create_vector()
 
     ##### Animation #####
     with open(bh_data, "r") as file:
         reader = csv.reader(file)
         _ = next(reader)  # skip the header row
+        
         v.DrawPlots()
-        for row in reader:
+        for i, row in enumerate(reader):
             # Move to the next gw vtk file
             v.TimeSliderNextState()
 
@@ -75,17 +92,26 @@ def main():
             L2_y = float(row[11])
             L2_z = float(row[12])
 
-            L1.point1 = (bh1_x, bh1_y, bh1_z)
-            L1.point2 = (bh1_x + L1_x, bh1_y + L1_y, bh1_z + L1_z)
-            L2.point1 = (bh2_x, bh2_y, bh2_z)
-            L2.point2 = (bh2_x + L2_x, bh2_y + L2_y, bh2_z + L2_z)
+            if show_angular_momentum_vectors:
+                L1.point1 = (bh1_x, bh1_y, bh1_z)
+                L1.point2 = (bh1_x + L1_x, bh1_y + L1_y, bh1_z + L1_z)
+                L2.point1 = (bh2_x, bh2_y, bh2_z)
+                L2.point2 = (bh2_x + L2_x, bh2_y + L2_y, bh2_z + L2_z)
             set_coords(0, bh1_x, bh1_y, bh1_z)
             set_coords(1, bh2_x, bh2_y, bh2_z)
+
+            set_view(
+                view_normal = (-0.188008, -0.842775, 0.504363), 
+                view_up = (0.00633342, 0.51247, 0.858682), 
+                zoom = 15 - min(7,(7 * i/1000)), 
+                collat_angle = 30
+            )
+            
             v.DrawPlots()
 
             # Save the window
             if record_render:
-                s = movie_atts()
+                s = movie_atts(movie_output_destination)
                 v.SetSaveWindowAttributes(s)
                 v.SaveWindow()
 
@@ -99,7 +125,7 @@ def main():
 
 
 # Sets the default attributes for the visualization
-def default_atts(movie_output_destination):
+def default_atts():
     ##### Annotation Parameters #####
     a = v.AnnotationAttributes()
     show_axis_annotations = False
@@ -121,16 +147,7 @@ def default_atts(movie_output_destination):
     # This doesn't work for some reason
     v.SetAnnotationAttributes(a)
 
-    ##### View Parameters #####
-    viewing_atts = v.View3DAttributes()
-    viewing_atts.viewNormal = (0, 0, 1)
-    viewing_atts.focus = (0, 0, 0)
-    viewing_atts.viewUp = (0, 1, 0)
-    viewing_atts.nearPlane = -28.4429
-    viewing_atts.farPlane = 28.4429
-    viewing_atts.windowValid = 1
-    v.SetView3D(viewing_atts)
-
+    ##### Appearance Parameters #####
     light = v.LightAttributes()
     light.enabledFlag = 1
     light.type = light.Object
@@ -146,7 +163,7 @@ def default_atts(movie_output_destination):
 
     ##### Recording Parameters #####
     green_screen = False
-    # background_image = os.path.join(parent_directory, )
+    # background_image = path/to/image
 
     if green_screen:
         a.backgroundColor = (0, 255, 0, 255)
@@ -161,17 +178,26 @@ def default_atts(movie_output_destination):
         a.imageRepeatX = 1
         a.imageRepeatY = 1
 
-    s = v.SaveWindowAttributes()
-    s.outputToCurrentDirectory = 0
-    s.outputDirectory = movie_output_destination
-    s.fileName = "BH_test_animation%04d.png"
-    s.format = s.PNG
-    s.progressive = 1
-    s.width = 772
-    s.height = 702
-    s.screenCapture = 1
-    v.SetSaveWindowAttributes(s)
+    return
 
+def set_view(focus = (0.0, 0.0, 0.0), view_normal = (0.0, 1.0, 0.0), view_up = (0.0, 1.0, 0.0), zoom = 1.0, collat_angle = 0.0):
+    ##### View Parameters #####
+    # I would love it if an argument wasn't included, it would just use current value instead of setting the default values above
+    viewing_atts = v.View3DAttributes()
+    viewing_atts.focus = focus
+    viewing_atts.viewNormal = view_normal
+    viewing_atts.viewUp = view_up
+    viewing_atts.imageZoom = zoom
+    viewing_atts.viewAngle = collat_angle
+
+    # IDK what these are but they're important
+    viewing_atts.parallelScale = 424.3
+    viewing_atts.nearPlane = -848.601
+    viewing_atts.farPlane = 848.601
+
+    v.SetView3D(viewing_atts)
+
+    return
 
 # Creates a black hole sphere object
 def create_sphere(bh_database):
@@ -190,12 +216,14 @@ def create_sphere(bh_database):
     v.AddOperator("Transform")
     v.SetPlotOptions(pseudocolor_atts)
 
+    return
+
 
 # Creates a gravitational wave mesh object
 def create_gw(gw_database):
     visit.OpenDatabase(gw_database)
 
-    # set attributes
+    # Set surface attributes
     pseudocolor_atts = v.PseudocolorAttributes()
     pseudocolor_atts.minFlag = 1
     pseudocolor_atts.min = -0.1
@@ -206,9 +234,20 @@ def create_gw(gw_database):
     pseudocolor_atts.useAboveMaxColor = 1
     pseudocolor_atts.aboveMaxColor = (0, 0, 255, 255)
     
+    # Set mesh attributes
+    mesh_atts = v.MeshAttributes()
+    mesh_atts.opaqueMode = mesh_atts.Auto  # Auto, On, Off
+    mesh_atts.opaqueColor = (255, 255, 255, 255)
+    mesh_atts.showInternal = 0
+    mesh_atts.opacity = 0.5
+
+
     v.AddPlot("Mesh", "mesh", 1, 1)
+    v.SetPlotOptions(mesh_atts)
     v.AddPlot("Pseudocolor", "mesh_quality/degree", 1, 1)
     v.SetPlotOptions(pseudocolor_atts)
+
+    return
 
 
 # Creates a vector annotation
@@ -216,10 +255,10 @@ def create_vector(color=(255, 255, 255, 255)):
     vec = v.CreateAnnotationObject("Line3D")
     vec.useForegroundForLineColor = 0
     vec.color = color
-    vec.width = 3
+    vec.width = 1
     vec.arrow2 = 1
-    vec.arrow2Height = 0.2
-    vec.arrow2Radius = 0.075
+    vec.arrow2Height = 0.6
+    vec.arrow2Radius = 0.3
 
     return vec
 
@@ -234,18 +273,21 @@ def set_coords(obj_num, x, y, z):
     trasnform_atts.translateZ = z
     v.SetOperatorOptions(trasnform_atts, 0, 0)
 
+    return
+
 
 # Sets the attributes for the movie
-def movie_atts():
+def movie_atts(movie_output_destination):
     s = v.SaveWindowAttributes()
-    s.fileName = "frame"
     s.format = s.PNG
     s.progressive = 1
     s.width = 772
     s.height = 702
     s.screenCapture = 1
+    s.outputToCurrentDirectory = 0
+    s.outputDirectory = movie_output_destination
+    s.fileName = "BH_test_animation%04d.png"
 
     return s
-
 
 main()
