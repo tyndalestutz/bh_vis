@@ -8,12 +8,12 @@ in the final mesh to recreate the full waveform.
 import sys
 import os
 import time
-import vtk
 from typing import Tuple, Dict, Any
 import numpy as np
 from numpy.typing import NDArray
 import quaternionic
 import spherical
+import vtk
 
 
 def read_strain_files(file_path: str) -> Tuple[NDArray[np.float64], Dict[Tuple[int, int], NDArray[np.complex128]]]:
