@@ -1,293 +1,432 @@
-"""
-
-This script takes in a black hole mesh (i.e. a sphere mesh), a gravitational wave mesh,
-and a csv file containing the coordinates of the black holes and the angular momenta
-of the black holes. It starts by initializing VisIt's (very many) attributes, creates
-the black holes, gravitational wave, and angular momentum vector objects, then
-animates the collision. If record_render is set to True, it will save the frames of
-the animation to the movie_output_destination directory, which will then be combined
-into a movie.
-
-"""
-
-import sys
+import os
 import csv
-import os
+import time
+import vtk
+from tvtk.api import tvtk
+from typing import Tuple, Dict, Any
+import numpy as np
+from numpy.typing import NDArray
+import quaternionic
+import spherical
+from mayavi import mlab
+from mayavi.api import Engine
+from mayavi.sources.vtk_data_source import VTKDataSource
+from mayavi.sources.parametric_surface import ParametricSurface
+from mayavi.modules.surface import Surface
 
-sys.path.append("/usr/local/3.3.1/linux-x86_64/lib/site-packages")
-import visit
 
-visit.Launch()
-import visit
-import os
+def read_strain_files(file_path: str) -> Tuple[NDArray[np.float64], Dict[Tuple[int, int], NDArray[np.complex128]]]:
+    """
+    Read an ASCII file with a header describing the real and imaginary parts of the data
+    for a specific l mode. Returns the time states and mode data in an easily retrievable format.
 
-v = visit
+    :param file_path: Path to the file to be read.
+    :return: A tuple containing the time (numpy array) 
+             and a dictionary with keys (l, m) containing the data.
+    :raises ValueError: if the length of the time data is inconsistent across different ell values.
+    """
+    mode_data: Dict[Tuple[int, int], NDArray[np.complex128]] = {}
+    time_data_size: int = -1
+    for ell in range(2, 9):
+        file_name = file_path.replace("[ELLVAL]", str(ell))
+        with open(file_name, "r", encoding="utf-8") as file:
+            # Read lines that don't start with '#'
+            print(file_name)
+            lines = [line for line in file.readlines() if not line.startswith("#")]
 
+        # Convert lines to arrays and sort by time
+        data: NDArray[np.float64] = np.array([list(map(np.float64, line.split())) for line in lines])
+        data = data[np.argsort(data[:, 0])]
 
-# Main function
-def main():
-    ##### File names #####
-    script_directory = os.path.dirname(os.path.abspath(__file__))
-    
-    sphere_object = os.path.join(
-        script_directory, "..", "data", "sphere.obj" # This path should stay the same
-    )
-    gw_database = os.path.join(
-        "/shared", "data", "dummy", "gw_dummy", "state*.vtu database"
-    )
-    bh_data = os.path.join(
-        "/shared", "data", "dummy", "bh_xyz_dummy.csv"
-    )
-    movie_output_destination = os.path.join(
-        script_directory, "../../movies/dummy"
-    )
-    
-    #create the movie_output_destination directory if it doesn't exist
-    if not os.path.exists(movie_output_destination):
-        os.makedirs(movie_output_destination)
+        # Remove duplicate times
+        _, index = np.unique(data[:, 0], return_index=True)
+        data = data[index]
 
-    ##### Parameters #####
-    record_render = True
-    show_angular_momentum_vectors = True
-
-    ##### Initialize Objects #####
-    default_atts()
-    set_view(
-        view_normal = (-0.188008, -0.842775, 0.504363), 
-        view_up = (0.00633342, 0.51247, 0.858682), 
-        zoom = 15, 
-        collat_angle = 30
-    )
-    create_sphere(sphere_object)  # Black hole 1
-    create_sphere(sphere_object)  # Black hole 2
-    create_gw(gw_database)  # Gravitational wave
-    if show_angular_momentum_vectors:
-        L1 = create_vector()
-        L2 = create_vector()
-
-    ##### Animation #####
-    with open(bh_data, "r") as file:
-        reader = csv.reader(file)
-        _ = next(reader)  # skip the header row
-        
-        v.DrawPlots()
-        for i, row in enumerate(reader):
-            # Move to the next gw vtk file
-            v.TimeSliderNextState()
-
-            # DEBUG maybe make this look a little nicer using tuples,
-            # don't want to mess with it until I can run it
-            # Set black hole xyz coordinates and the xyz magnitues of the angular momenta
-            _ = float(row[0]) # time
-            bh1_x = float(row[1])
-            bh1_y = float(row[2])
-            bh1_z = float(row[3])
-            L1_x = float(row[4])
-            L1_y = float(row[5])
-            L1_z = float(row[6])
-            bh2_x = float(row[7])
-            bh2_y = float(row[8])
-            bh2_z = float(row[9])
-            L2_x = float(row[10])
-            L2_y = float(row[11])
-            L2_z = float(row[12])
-
-            if show_angular_momentum_vectors:
-                L1.point1 = (bh1_x, bh1_y, bh1_z)
-                L1.point2 = (bh1_x + L1_x, bh1_y + L1_y, bh1_z + L1_z)
-                L2.point1 = (bh2_x, bh2_y, bh2_z)
-                L2.point2 = (bh2_x + L2_x, bh2_y + L2_y, bh2_z + L2_z)
-            set_coords(0, bh1_x, bh1_y, bh1_z)
-            set_coords(1, bh2_x, bh2_y, bh2_z)
-
-            set_view(
-                view_normal = (-0.188008, -0.842775, 0.504363), 
-                view_up = (0.00633342, 0.51247, 0.858682), 
-                zoom = 15 - min(7,(7 * i/1000)), 
-                collat_angle = 30
+        # Store time data and check for discrepancies between modes
+        time_data: NDArray[np.float64] = data[:, 0]
+        if time_data_size < 0:
+            time_data_size = len(time_data)
+        elif time_data_size != len(time_data):
+            raise ValueError(
+                f"""Inconsistent time data size for ell={ell}. 
+                Expected {time_data_size}, got {len(time_data)}."""
             )
-            
-            v.DrawPlots()
 
-            # Save the window
-            if record_render:
-                s = movie_atts(movie_output_destination)
-                v.SetSaveWindowAttributes(s)
-                v.SaveWindow()
+        # Loop through columns and store real and imaginary parts in dictionary
+        for em in range(-ell, ell + 1):
+            mode_index: int = 1 + 2 * (em + ell)  # the index for the real valued strain
+            mode_data[(ell, em)] = data[:, mode_index] + 1j * data[:, mode_index + 1]
 
-    # This is bash code that will combine the frames into a movie,
-    # lets incorporate it into the script
-    # Either by calling it from the script or by writing it in python
-
-    # frame_name_pattern = "synthetic_BH_test_animation_%04d.png"
-    # movie_name = "streamline_crop_example.mp4"
-    # ffmpeg -framerate 1000 -i synthetic_BH_test_animation%04d.png -vf "scale=770:-2" -c:v libx264 -r 1000 -pix_fmt yuv420p output.mp4
+    return time_data, mode_data
 
 
-# Sets the default attributes for the visualization
-def default_atts():
-    ##### Annotation Parameters #####
-    a = v.AnnotationAttributes()
-    show_axis_annotations = False
-    if not show_axis_annotations:
-        a.axes2D.visible = 0
-        a.axes3D.visible = 0
-        a.axes3D.triadFlag = 0
-        a.axes3D.bboxFlag = 0
-        a.axes3D.xAxis.grid = 0
-        a.axes3D.yAxis.grid = 0
-        a.axes3D.zAxis.grid = 0
-        a.axes3D.triadLineWidth = 0
-    a.userInfoFlag = 0
-    a.databaseInfoFlag = 0
-    a.legendInfoFlag = 0
-    a.axesArray.lineWidth = 0
-    a.axesArray.axes.grid = 0
+def find_swsh_factor(colat: float, azi: float, ell: int, em: int) -> Any:
+    """
+    Calculates the complex valued spin-weighted spherical harmonic (SWSH) factors to be
+    multiplied with strain. Uses spherical package to find the factor and the inputted
+    colatitude, azimuthal, l, and m values, and a physically defined spin = -2 value.
 
-    # This doesn't work for some reason
-    v.SetAnnotationAttributes(a)
-
-    ##### Appearance Parameters #####
-    light = v.LightAttributes()
-    light.enabledFlag = 1
-    light.type = light.Object
-    light.direction = (0.666, -0.666, -0.666)
-    v.SetLight(0, light)
-
-    rendering_atts = v.RenderingAttributes()
-    rendering_atts.specularFlag = 1
-    rendering_atts.specularCoeff = 0.13
-    rendering_atts.specularPower = 3.2
-    rendering_atts.specularColor = (255, 255, 255, 255)
-    v.SetRenderingAttributes(rendering_atts)
-
-    ##### Recording Parameters #####
-    green_screen = False
-    # background_image = path/to/image
-
-    if green_screen:
-        a.backgroundColor = (0, 255, 0, 255)
-        a.foregroundColor = (255, 255, 255, 255)
-        a.backgroundMode = a.Solid  # Solid, Gradient, Image, ImageSphere
-    else:
-        a.gradientBackgroundStyle = a.Image
-        a.gradientColor1 = (80, 80, 80, 255)
-        a.gradientColor2 = (70, 70, 70, 255)
-        # a.backgroundImage = background_image
-        a.backgroundMode = a.Gradient  # Solid, Gradient, Image, ImageSphere
-        a.imageRepeatX = 1
-        a.imageRepeatY = 1
-
-    return
-
-def set_view(focus = (0.0, 0.0, 0.0), view_normal = (0.0, 1.0, 0.0), view_up = (0.0, 1.0, 0.0), zoom = 1.0, collat_angle = 0.0):
-    ##### View Parameters #####
-    # I would love it if an argument wasn't included, it would just use current value instead of setting the default values above
-    viewing_atts = v.View3DAttributes()
-    viewing_atts.focus = focus
-    viewing_atts.viewNormal = view_normal
-    viewing_atts.viewUp = view_up
-    viewing_atts.imageZoom = zoom
-    viewing_atts.viewAngle = collat_angle
-
-    # IDK what these are but they're important
-    viewing_atts.parallelScale = 424.3
-    viewing_atts.nearPlane = -848.601
-    viewing_atts.farPlane = 848.601
-
-    v.SetView3D(viewing_atts)
-
-    return
-
-# Creates a black hole sphere object
-def create_sphere(bh_database):
-    visit.OpenDatabase(bh_database)
-    pseudocolor_atts = v.PseudocolorAttributes()
-    pseudocolor_atts.minFlag = 1
-    pseudocolor_atts.min = -0.1
-    pseudocolor_atts.useBelowMinColor = 1
-    pseudocolor_atts.belowMinColor = (31, 31, 31, 255)
-    pseudocolor_atts.maxFlag = 1
-    pseudocolor_atts.max = 0.1
-    pseudocolor_atts.useAboveMaxColor = 1
-    pseudocolor_atts.aboveMaxColor = (0, 255, 0, 255)
-
-    v.AddPlot("Pseudocolor", "mesh_quality/warpage", 1, 1)
-    v.AddOperator("Transform")
-    v.SetPlotOptions(pseudocolor_atts)
-
-    return
+    :param colat: colatitude angle for the SWSH factor
+    :param azi: azimuthal angle for the SWSH factor
+    :param ell: wave mode value l
+    :param em: wave mode value m
+    :return: a complex valued spin-weighted spherical harmonic factor
+    """
+    s = -2
+    R = quaternionic.array.from_spherical_coordinates(colat, azi)
+    winger = spherical.Wigner(8)  # Create a Winger matrix for all modes from l=2 to l=8
+    Y = winger.sYlm(s, R)
+    swsh_factor = Y[winger.Yindex(ell, em)]
+    return swsh_factor
 
 
-# Creates a gravitational wave mesh object
-def create_gw(gw_database):
-    visit.OpenDatabase(gw_database)
+def superimpose_modes_from_angle(colat: float, azi: float, num_time_states: int, mode_data: Dict[Tuple[int, int], NDArray[np.complex128]]):
+    """
+    Adds up all the strain modes after factoring in corresponding spin-weighted spherical harmonic
+    to specified angle in the mesh. Stored as a new array corresponding to time states.
 
-    # Set surface attributes
-    pseudocolor_atts = v.PseudocolorAttributes()
-    pseudocolor_atts.minFlag = 1
-    pseudocolor_atts.min = -0.1
-    pseudocolor_atts.useBelowMinColor = 1
-    pseudocolor_atts.belowMinColor = (0, 0, 255, 255)
-    pseudocolor_atts.maxFlag = 1
-    pseudocolor_atts.max = 0.1
-    pseudocolor_atts.useAboveMaxColor = 1
-    pseudocolor_atts.aboveMaxColor = (0, 0, 255, 255)
-    
-    # Set mesh attributes
-    mesh_atts = v.MeshAttributes()
-    mesh_atts.opaqueMode = mesh_atts.Auto  # Auto, On, Off
-    mesh_atts.opaqueColor = (255, 255, 255, 255)
-    mesh_atts.showInternal = 0
-    mesh_atts.opacity = 0.5
+    :param colat: colatitude angle for the SWSH factor
+    :param azi: azimuthal angle for the SWSH factor
+    :param num_time_states: number of time states in the strain data
+    :param mode_data: dictionary containing strain data for all the modes
+    :return: a complex valued numpy array of the superimposed wave
+    """
+    summation: NDArray[np.int64] = np.zeros(num_time_states, dtype="complex128")
+    for ell in range(2, 9):
+        for em in range(-ell, ell + 1):
+            swsh_factor = find_swsh_factor(colat, azi, ell, em)
+            factored_strain = mode_data[(ell, em)] * swsh_factor
+            summation += factored_strain
+    return summation
 
 
-    v.AddPlot("Mesh", "mesh", 1, 1)
-    v.SetPlotOptions(mesh_atts)
-    v.AddPlot("Pseudocolor", "mesh_quality/degree", 1, 1)
-    v.SetPlotOptions(pseudocolor_atts)
+def generate_interpolation_points(time_array: NDArray[np.float64], radius_values: NDArray[np.float64], r_ext: int
+    ) -> NDArray[np.float64]:
+    """
+    Fills out a 2D array of adjusted time values for the wave strain to be
+    linearly interpolated to. First index of the result represents the simulation
+    time state (aka which mesh), and the second index represents radial distance to
+    interpolate to.
 
+    :param time_array: numpy array of of strain time states.
+    :param radius_values: numpy array of the radial points on the mesh.
+    :param r_ext: extraction radius of the original data.
+    :return: a 2D numpy array of time values.
+    """
+
+    time_0 = np.min(time_array)
+    time_f = np.max(time_array)
+    target_times = np.zeros((len(time_array), len(radius_values)))
+    for state, current_time in enumerate(time_array):
+        for j, radius in enumerate(radius_values):
+            target_time = current_time - radius + r_ext
+            if target_time < time_0:
+                target_time = time_0
+            elif target_time > time_f:
+                target_time = time_f
+            target_times[state][j] = target_time
+    return target_times
+
+
+def initialize_tvtk_grid(num_azi, num_radius):
+   """
+   Sets initial parameters for the mesh generation module and returns
+   mesh manipulation objects to write and save data.
+
+   :param num_azi: number of azimuthal points on the mesh
+   :param num_radius: number of radial points on the mesh
+   :returns: tvtk.api.DataArray(),
+            tvtkUnstructuredGrid(),
+            tvtkPoints()
+   """
+   # Create tvtk objects
+   points = tvtk.Points()
+   grid = tvtk.UnstructuredGrid()
+   strain_array = tvtk.FloatArray(
+      name="Strain", number_of_components=1, number_of_tuples=num_azi * num_radius
+   )
+
+   # Create cells
+   cell_array = tvtk.CellArray()
+   for j in range(num_radius - 1):
+      for i in range(num_azi):
+         cell = tvtk.Quad()
+         point_ids = [i + j * num_azi, (i + 1) % num_azi + j * num_azi,
+            (i + 1) % num_azi + (j + 1) * num_azi, i + (j + 1) * num_azi]
+         for idx, pid in enumerate(point_ids): 
+               cell.point_ids.set_id(idx, pid)
+         cell_array.insert_next_cell(cell)
+
+   # Set grid properties
+   #grid.points = points
+   grid.set_cells(tvtk.Quad().cell_type, cell_array) 
+
+   return strain_array, grid, points
+
+
+def create_gw(engine, grid, color):
+    scene = engine.scenes[0]
+    gw = VTKDataSource(data = grid)
+    engine.add_source(gw, scene)
+    s = Surface()
+    engine.add_filter(s, gw)
+    s.actor.mapper.scalar_visibility = False
+    s.actor.property.color = color
     return
 
 
-# Creates a vector annotation
-def create_vector(color=(255, 255, 255, 255)):
-    vec = v.CreateAnnotationObject("Line3D")
-    vec.useForegroundForLineColor = 0
-    vec.color = color
-    vec.width = 1
-    vec.arrow2 = 1
-    vec.arrow2Height = 0.6
-    vec.arrow2Radius = 0.3
+def create_sphere(engine: Engine, radius: float = 1, color: tuple[float, float, float] = (1, 0, 0)):
+    """
+    Creates and displays a parametric surface with the given parameters.
+    :param engine: Mayavi engine
+    :param radius: radius of the sphere 
+    :param color: color of the sphere in a tuple ranging from (0, 0, 0) to (1, 1, 1)
+    """
+    scene = engine.scenes[0]
+    ps = ParametricSurface()
+    ps.function = 'ellipsoid'
+    ps.parametric_function.x_radius = radius
+    ps.parametric_function.y_radius = radius
+    ps.parametric_function.z_radius = radius
 
-    return vec
-
-
-# Sets the coordinates of object num obj_num
-def set_coords(obj_num, x, y, z):
-    v.SetActivePlots(obj_num)
-    trasnform_atts = v.TransformAttributes()
-    trasnform_atts.doTranslate = 1
-    trasnform_atts.translateX = x
-    trasnform_atts.translateY = y
-    trasnform_atts.translateZ = z
-    v.SetOperatorOptions(trasnform_atts, 0, 0)
-
-    return
-
-
-# Sets the attributes for the movie
-def movie_atts(movie_output_destination):
-    s = v.SaveWindowAttributes()
-    s.format = s.PNG
-    s.progressive = 1
-    s.width = 772
-    s.height = 702
-    s.screenCapture = 1
-    s.outputToCurrentDirectory = 0
-    s.outputDirectory = movie_output_destination
-    s.fileName = "BH_test_animation%04d.png"
-
+    engine.add_source(ps, scene)
+    s = Surface()
+    engine.add_filter(s, ps)
+    s.actor.mapper.scalar_visibility = False
+    s.actor.property.color = color
     return s
 
-main()
+
+def change_object_position(obj: Surface, position: tuple[float, float, float]):
+    """
+    Changes the Cartesian position of a Mayavi object to the given parameters.
+    :param engine: Mayavi engine
+    :param obj: Mayavi object
+    :param position: position of the object
+    """
+    position = np.array(position) 
+    obj.actor.actor.position = position
+
+
+def change_view(engine: Engine, position: tuple[float, float, float] = None, focal_point: tuple[float, float, float] = None, view_up: tuple[float, float, float] = None, view_angle: float = None, clipping_range: tuple[float, float] = None):
+   """
+   Changes the view of the Mayavi engine to the given parameters.
+   :param engine: Mayavi engine
+   :param position: position of the camera, default is current position
+   :param focal_point: focal point of the camera, default is current focal point
+   :param view_up: view up vector of the camera, default is current view up vector
+   :param view_angle: view angle of the camera, default is current view angle
+   """
+
+   scene = engine.scenes[0]
+   if position is not None:
+      scene.scene.camera.position = position
+   if focal_point is not None:
+      scene.scene.camera.focal_point = focal_point
+   if view_up is not None:
+      scene.scene.camera.view_up = view_up
+   if view_angle is not None:
+      scene.scene.camera.view_angle = 30.0
+   if clipping_range is not None:
+      scene.scene.camera.clipping_range = clipping_range
+   scene.scene.camera.compute_view_plane_normal()
+   
+
+def dhms_time(seconds):
+    """
+    Converts a given number of seconds into a string indicating the remaining time.
+    :param seconds: number of seconds
+    :return: a string indicating the remaining time
+    """
+
+    days_in_seconds = 24 * 60 * 60
+    hours_in_seconds = 60 * 60
+    minutes_in_seconds = 60
+
+    # Calculate remaining days, hours, and minutes
+    days = int(seconds // days_in_seconds)
+    remaining_seconds = seconds % days_in_seconds
+    hours = int(remaining_seconds // hours_in_seconds)
+    remaining_seconds = remaining_seconds % hours_in_seconds
+    minutes = int(remaining_seconds // minutes_in_seconds)
+
+    # Build the output string
+    output = ""
+    if days > 0:
+        output += f"{days} days"
+    if hours > 0:
+        if days > 0:
+            output += " "
+        output += f"{hours} hours"
+    if minutes > 0:
+        if days > 0 or hours > 0:
+            output += " "
+        output += f"{minutes} minutes"
+    return output
+
+
+def main():
+    """
+    Main function that reads the strain data, 
+    calculates and factors in spin-weighted spherical harmonics,
+    linearly interpolates the strain to fit the mesh points, 
+    and creates .vtu mesh file for each time state of the simulation. 
+    The meshes represent the full superimposed waveform at the polar angle pi/2,
+    aka the same plane as the binary black hole merger.
+    """
+
+    # File names
+    gw_file_name = "Rpsi4_r0100.0_l[ELLVAL]_conv_to_strain.txt"
+    gw_file_path = os.path.abspath(
+        os.path.join(__file__, "..", "..", "r100", gw_file_name)
+    )
+    bh_file_name = "bh_synthetic.csv"
+    bh_file_path = os.path.abspath(
+        os.path.join(__file__, "..", "..", "..", bh_file_name)
+    )
+    movie_file_name = "synthetic_movie"
+    movie_file_path = os.path.abspath(
+        os.path.join(__file__, "..", "..", "..", "movies", movie_file_name)
+    )
+    if not os.path.exists(movie_file_path): # Create the directory if it doesn't exist
+        os.makedirs(movie_file_path)
+    
+
+    # Mathematical parameters
+    num_radius_points = 450
+    num_azi_points = 180
+    display_radius = 300 
+    R_extraction = 100
+    amplitude_scale_factor = 600 
+    omitted_radius_length = 20 
+    colat = np.pi / 2  # colatitude angle representative of the plane of merger
+
+    # Cosmetic parameters
+    status_messages = True
+    save_rate = 10 # Saves every Nth frame
+    gw_color = (0.28, 0.46, 1.0)
+    bh_color = (0.1, 0.1, 0.1)
+    bh1_mass = 1.24 
+    bh2_mass = 1
+    bh_scaling_factor = 1 
+
+    # Import strain data
+    time_array, mode_data = read_strain_files(gw_file_path)
+    num_time_states = len(time_array)
+
+    # Import black hole data
+    with open(bh_file_path, "r") as file:
+        reader = csv.reader(file)
+        _ = next(reader)  # skip the header row
+        bh_data = np.array([row for row in reader])
+
+    # Pre-compute theta and radius values for the mesh
+    radius_values = np.linspace(0, display_radius, num_radius_points)
+    azimuth_values = np.linspace(0, 2 * np.pi, num_azi_points, endpoint=False)
+    rv, az = np.meshgrid(radius_values, azimuth_values, indexing="ij")
+    x_values = rv * np.cos(az)
+    y_values = rv * np.sin(az)
+    
+    strain_to_mesh = (
+        {}
+    )  # Holds the final strain points indexed [azimuthal point (key)][time state][radius]
+
+    # Apply spin-weighted spherical harmonics, superimpose modes, and interpolate to mesh points
+    interpolation_times = generate_interpolation_points(
+        time_array, radius_values, R_extraction
+    )
+    for azi_index, azi in enumerate(azimuth_values):
+        superimposed_strain = superimpose_modes_from_angle(
+            colat, azi, num_time_states, mode_data
+        )
+        strain_to_mesh[azi_index] = np.interp(
+            interpolation_times, time_array, superimposed_strain
+        )
+
+    strain_array, grid, points = initialize_tvtk_grid(
+        num_azi_points, num_radius_points
+    )
+
+    # Create Mayavi objects
+    engine = Engine()
+    engine.start()
+    engine.new_scene()
+    engine.scenes[0].scene.jpeg_quality = 100
+    #mlab.options.offscreen = True 
+    create_gw(engine, grid, gw_color)
+    bh1 = create_sphere(engine, bh1_mass * bh_scaling_factor, bh_color)
+    bh2 = create_sphere(engine, bh2_mass * bh_scaling_factor, bh_color)
+    mlab.view(azimuth=60, elevation = 50, distance = 80 , focalpoint=(0,0,0)) # Initialize viewpoint
+    
+    start_time = time.time()
+    percentage = np.round(np.linspace(0, num_time_states/save_rate, 101)).astype(int)
+
+    @mlab.animate()#ui=False) This doesn't work for some reason?
+    def anim():
+        for state, t, row in zip(range(num_time_states), time_array, bh_data):
+            if state % save_rate != 0:
+                continue
+
+            # Print status messages
+            if state == 10:
+                end_time = time.time()
+                eta = (end_time - start_time) * num_time_states / 10
+                print(
+                    f"""Creating {num_time_states} frames and saving them to: 
+                    {movie_file_path}\nEstimated time: {dhms_time(eta)}"""
+                )
+            if status_messages and state != 0 and np.isin(state, percentage):
+                print(f" {int(state * 100 / (num_time_states - 1))}% done", end="\r")
+
+            # Change the position of the black holes
+            _ = float(row[0]) # time
+            bh1_xyz = (float(row[1]), float(row[2]), float(row[3]))
+            bh2_xyz = (float(row[4]), float(row[5]), float(row[6]))
+            change_object_position(bh1, bh1_xyz)
+            change_object_position(bh2, bh2_xyz)
+
+            points.reset()
+            index = 0
+            for j, radius in enumerate(radius_values):
+                for i, azi in enumerate(azimuth_values):
+                    h_tR = strain_to_mesh[i][state][j].real
+                    x = x_values[j, i]
+                    y = y_values[j, i]
+                    if (
+                        radius <= omitted_radius_length
+                    ):  # Introduce a discontinuity to make room for the Black Holes
+                        z = np.nan
+                        strain_value = np.nan
+                    else:
+                        strain_value = h_tR * amplitude_scale_factor
+                        z = strain_value 
+                    points.insert_next_point(x, y, z)
+                    strain_array.set_tuple1(index, strain_value)
+                    index += 1
+            grid._set_points(points)
+            grid._get_point_data().add_array(strain_array)
+            grid.modified()
+
+            mlab.view(
+                azimuth= min(60 + state*0.018, 78), 
+                elevation = max(50 - state*0.016, 34),
+                distance = min(80 + state*0.35, 430) 
+            )
+
+            # Save the frame
+            frame_path = os.path.join(movie_file_path, f"{movie_file_name}{state:05d}.png")
+            mlab.savefig(frame_path)
+
+            if state == num_time_states - 1:
+                total_time = time.time() - start_time
+                print(f" {int(state * 100 / (num_time_states - 1))}% done", end="\r")
+                print(f"\nSaved {num_time_states} frames to {movie_file_path} in {dhms_time(total_time)}.")
+                exit(0)
+            yield
+    
+    anim()
+    mlab.show()    
+                
+
+if __name__ == "__main__":
+    main()
