@@ -284,7 +284,7 @@ def main():
     bh_file_path = os.path.abspath(
         os.path.join(__file__, "..", "..", "..", bh_file_name)
     )
-    movie_file_name = "synthetic_movie"
+    movie_file_name = "test"
     movie_file_path = os.path.abspath(
         os.path.join(__file__, "..", "..", "..", "movies", movie_file_name)
     )
