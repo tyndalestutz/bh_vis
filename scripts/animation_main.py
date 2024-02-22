@@ -1,7 +1,7 @@
 import os
 import csv
 import time
-import vtk
+import vtk # Even though we don't use it directly, TVTK requires it
 from tvtk.api import tvtk
 from typing import Tuple, Dict, Any
 import numpy as np
