@@ -136,10 +136,10 @@ def psi4_fft_to_strain(input_dir="r100", output_dir="new", num_azi_pts=180, cola
         strain[:,idx_azi] = np.fft.ifft(fft_result)
 
         output_file = f"{output_dir}/Strain_azi_{azi/np.pi:.2f}pi_r0100.txt"
-        with open(output_file, "w") as file:
-            file.write("# Time    Strain_Real    Strain_Imag\n")
-            for t, real, imag in zip(time, np.real(strain[:,idx_azi]), np.imag(strain[:,idx_azi])):
-                file.write(f"{t:.16g} {real:.16g} {imag:.16g}\n")
+        # with open(output_file, "w") as file:
+        #     file.write("# Time    Strain_Real    Strain_Imag\n")
+        #     for t, real, imag in zip(time, np.real(strain[:,idx_azi]), np.imag(strain[:,idx_azi])):
+        #         file.write(f"{t:.16g} {real:.16g} {imag:.16g}\n")
         #print(f"Second time integral data has been saved to {output_file}")
 
     #idx_azi = 0
