@@ -282,7 +282,7 @@ def main():
     )
     bh_file_name = "bh_synthetic.csv"
     bh_file_path = os.path.abspath(
-        os.path.join(__file__, "..", "..", "..", bh_file_name)
+        os.path.join(__file__, "..", bh_file_name)
     )
     movie_file_name = "test"
     movie_file_path = os.path.abspath(
