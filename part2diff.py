@@ -14,8 +14,15 @@ from numpy.typing import NDArray
 import quaternionic
 import spherical
 import vtk
+#Section1
+#Section2
+#Section3
+#Section4
 
-
+#End Part 1
+#Diff match help 1
+#Diff match help 2
+#Section5
 def read_strain_files(file_path: str) -> Tuple[NDArray[np.float64], Dict[Tuple[int, int], NDArray[np.complex128]]]:
     """
     Read an ASCII file with a header describing the real and imaginary parts of the data
@@ -80,7 +87,7 @@ def find_swsh_factor(colat: float, azi: float, ell: int, em: int) -> Any:
     swsh_factor = Y[winger.Yindex(ell, em)]
     return swsh_factor
 
-
+#Section6
 def superimpose_modes_from_angle(colat: float, azi: float, num_time_states: int, mode_data: Dict[Tuple[int, int], NDArray[np.complex128]]):
     """
     Adds up all the strain modes after factoring in corresponding spin-weighted spherical harmonic
@@ -100,7 +107,7 @@ def superimpose_modes_from_angle(colat: float, azi: float, num_time_states: int,
             summation += factored_strain
     return summation
 
-
+#Section7
 def generate_interpolation_points(time_array: NDArray[np.float64], radius_values: NDArray[np.float64], r_ext: int
     ) -> NDArray[np.float64]:
     """
@@ -192,7 +199,7 @@ def check_output_directory(output_directory):
                 print("Exiting Program. Change output directory to an empty directory.")
                 sys.exit()
 
-
+#Section8
 def main():
     """
     Main function that reads the strain data, 
@@ -296,7 +303,7 @@ def main():
         )
         writer.SetInputData(grid)
         writer.Write()
-
+#End Section
 
 if __name__ == "__main__":
     main()
