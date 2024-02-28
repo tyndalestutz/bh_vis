@@ -1,13 +1,20 @@
+"""
+A script that reads in gravitational wave strain data and black hole positional data,
+applies spin-weighted spherical harmonics to the data, and creates a Mayavi animation
+of the black holes and their gravitational waves. At each state, the black holes are 
+moved to their respective positions and the render is saved as a .png file.
+"""
+
 import os
 import csv
 import time
-import vtk # Even though we don't use it directly, TVTK requires it
-from tvtk.api import tvtk
-from typing import Tuple, Dict, Any
-import numpy as np
-from numpy.typing import NDArray
 import quaternionic
 import spherical
+import vtk  # Even though we don't use it directly, TVTK requires it
+import numpy as np
+from typing import Tuple, Dict, Any
+from numpy.typing import NDArray
+from tvtk.api import tvtk
 from mayavi import mlab
 from mayavi.api import Engine
 from mayavi.sources.vtk_data_source import VTKDataSource
@@ -15,13 +22,15 @@ from mayavi.sources.parametric_surface import ParametricSurface
 from mayavi.modules.surface import Surface
 
 
-def read_strain_files(file_path: str) -> Tuple[NDArray[np.float64], Dict[Tuple[int, int], NDArray[np.complex128]]]:
+def read_strain_files(
+    file_path: str,
+) -> Tuple[NDArray[np.float64], Dict[Tuple[int, int], NDArray[np.complex128]]]:
     """
     Read an ASCII file with a header describing the real and imaginary parts of the data
     for a specific l mode. Returns the time states and mode data in an easily retrievable format.
 
     :param file_path: Path to the file to be read.
-    :return: A tuple containing the time (numpy array) 
+    :return: A tuple containing the time (numpy array)
              and a dictionary with keys (l, m) containing the data.
     :raises ValueError: if the length of the time data is inconsistent across different ell values.
     """
@@ -35,7 +44,9 @@ def read_strain_files(file_path: str) -> Tuple[NDArray[np.float64], Dict[Tuple[i
             lines = [line for line in file.readlines() if not line.startswith("#")]
 
         # Convert lines to arrays and sort by time
-        data: NDArray[np.float64] = np.array([list(map(np.float64, line.split())) for line in lines])
+        data: NDArray[np.float64] = np.array(
+            [list(map(np.float64, line.split())) for line in lines]
+        )
         data = data[np.argsort(data[:, 0])]
 
         # Remove duplicate times
@@ -80,7 +91,12 @@ def find_swsh_factor(colat: float, azi: float, ell: int, em: int) -> Any:
     return swsh_factor
 
 
-def superimpose_modes_from_angle(colat: float, azi: float, num_time_states: int, mode_data: Dict[Tuple[int, int], NDArray[np.complex128]]):
+def superimpose_modes_from_angle(
+    colat: float,
+    azi: float,
+    num_time_states: int,
+    mode_data: Dict[Tuple[int, int], NDArray[np.complex128]],
+):
     """
     Adds up all the strain modes after factoring in corresponding spin-weighted spherical harmonic
     to specified angle in the mesh. Stored as a new array corresponding to time states.
@@ -100,8 +116,9 @@ def superimpose_modes_from_angle(colat: float, azi: float, num_time_states: int,
     return summation
 
 
-def generate_interpolation_points(time_array: NDArray[np.float64], radius_values: NDArray[np.float64], r_ext: int
-    ) -> NDArray[np.float64]:
+def generate_interpolation_points(
+    time_array: NDArray[np.float64], radius_values: NDArray[np.float64], r_ext: int
+) -> NDArray[np.float64]:
     """
     Fills out a 2D array of adjusted time values for the wave strain to be
     linearly interpolated to. First index of the result represents the simulation
@@ -128,63 +145,79 @@ def generate_interpolation_points(time_array: NDArray[np.float64], radius_values
     return target_times
 
 
-def initialize_tvtk_grid(num_azi, num_radius):
-   """
-   Sets initial parameters for the mesh generation module and returns
-   mesh manipulation objects to write and save data.
+def initialize_tvtk_grid(num_azi: int, num_radius: int) -> Tuple:
+    """
+    Sets initial parameters for the mesh generation module and returns
+    a circular, polar mesh with manipulation objects to write and save data.
 
-   :param num_azi: number of azimuthal points on the mesh
-   :param num_radius: number of radial points on the mesh
-   :returns: tvtk.api.DataArray(),
-            tvtkUnstructuredGrid(),
-            tvtkPoints()
-   """
-   # Create tvtk objects
-   points = tvtk.Points()
-   grid = tvtk.UnstructuredGrid()
-   strain_array = tvtk.FloatArray(
-      name="Strain", number_of_components=1, number_of_tuples=num_azi * num_radius
-   )
+    :param num_azi: number of azimuthal points on the mesh
+    :param num_radius: number of radial points on the mesh
+    :returns: tvtk.FloatArray,
+             tvtk.UnstructuredGrid,
+             tvtk.Points
+    """
+    # Create tvtk objects
+    points = tvtk.Points()
+    grid = tvtk.UnstructuredGrid()
+    strain_array = tvtk.FloatArray(
+        name="Strain", number_of_components=1, number_of_tuples=num_azi * num_radius
+    )
 
-   # Create cells
-   cell_array = tvtk.CellArray()
-   for j in range(num_radius - 1):
-      for i in range(num_azi):
-         cell = tvtk.Quad()
-         point_ids = [i + j * num_azi, (i + 1) % num_azi + j * num_azi,
-            (i + 1) % num_azi + (j + 1) * num_azi, i + (j + 1) * num_azi]
-         for idx, pid in enumerate(point_ids): 
-               cell.point_ids.set_id(idx, pid)
-         cell_array.insert_next_cell(cell)
+    # Create cells
+    cell_array = tvtk.CellArray()
+    for j in range(num_radius - 1):
+        for i in range(num_azi):
+            cell = tvtk.Quad()
+            point_ids = [
+                i + j * num_azi,
+                (i + 1) % num_azi + j * num_azi,
+                (i + 1) % num_azi + (j + 1) * num_azi,
+                i + (j + 1) * num_azi,
+            ]
+            for idx, pid in enumerate(point_ids):
+                cell.point_ids.set_id(idx, pid)
+            cell_array.insert_next_cell(cell)
 
-   # Set grid properties
-   #grid.points = points
-   grid.set_cells(tvtk.Quad().cell_type, cell_array) 
+    # Set grid properties
+    # grid.points = points
+    grid.set_cells(tvtk.Quad().cell_type, cell_array)
 
-   return strain_array, grid, points
+    return strain_array, grid, points
 
 
-def create_gw(engine, grid, color):
+def create_gw(
+    engine: Engine,
+    grid: Any,
+    color: Tuple[float, float, float],
+) -> None:
+    """
+    Creates and displays a gravitational wave strain from a given grid.
+    :param engine: Mayavi engine
+    :param grid: tvtk.UnstructuredGrid
+    :param color: color of the strain in a tuple ranging from (0, 0, 0) to (1, 1, 1)
+    """
+
     scene = engine.scenes[0]
-    gw = VTKDataSource(data = grid)
+    gw = VTKDataSource(data=grid)
     engine.add_source(gw, scene)
     s = Surface()
     engine.add_filter(s, gw)
     s.actor.mapper.scalar_visibility = False
     s.actor.property.color = color
-    return
 
 
-def create_sphere(engine: Engine, radius: float = 1, color: tuple[float, float, float] = (1, 0, 0)):
+def create_sphere(
+    engine: Engine, radius: float = 1, color: tuple[float, float, float] = (1, 0, 0)
+) -> Surface:
     """
-    Creates and displays a parametric surface with the given parameters.
+    Creates and displays a spherical surface with the given parameters.
     :param engine: Mayavi engine
-    :param radius: radius of the sphere 
+    :param radius: radius of the sphere
     :param color: color of the sphere in a tuple ranging from (0, 0, 0) to (1, 1, 1)
     """
     scene = engine.scenes[0]
     ps = ParametricSurface()
-    ps.function = 'ellipsoid'
+    ps.function = "ellipsoid"
     ps.parametric_function.x_radius = radius
     ps.parametric_function.y_radius = radius
     ps.parametric_function.z_radius = radius
@@ -197,42 +230,18 @@ def create_sphere(engine: Engine, radius: float = 1, color: tuple[float, float, 
     return s
 
 
-def change_object_position(obj: Surface, position: tuple[float, float, float]):
+def change_object_position(obj: Surface, position: tuple[float, float, float]) -> None:
     """
-    Changes the Cartesian position of a Mayavi object to the given parameters.
+    Changes the Cartesian position of a Mayavi surface to the given parameters.
     :param engine: Mayavi engine
     :param obj: Mayavi object
     :param position: position of the object
     """
-    position = np.array(position) 
+    position = np.array(position)
     obj.actor.actor.position = position
 
 
-def change_view(engine: Engine, position: tuple[float, float, float] = None, focal_point: tuple[float, float, float] = None, view_up: tuple[float, float, float] = None, view_angle: float = None, clipping_range: tuple[float, float] = None):
-   """
-   Changes the view of the Mayavi engine to the given parameters.
-   :param engine: Mayavi engine
-   :param position: position of the camera, default is current position
-   :param focal_point: focal point of the camera, default is current focal point
-   :param view_up: view up vector of the camera, default is current view up vector
-   :param view_angle: view angle of the camera, default is current view angle
-   """
-
-   scene = engine.scenes[0]
-   if position is not None:
-      scene.scene.camera.position = position
-   if focal_point is not None:
-      scene.scene.camera.focal_point = focal_point
-   if view_up is not None:
-      scene.scene.camera.view_up = view_up
-   if view_angle is not None:
-      scene.scene.camera.view_angle = 30.0
-   if clipping_range is not None:
-      scene.scene.camera.clipping_range = clipping_range
-   scene.scene.camera.compute_view_plane_normal()
-   
-
-def dhms_time(seconds):
+def dhms_time(seconds: float) -> str:
     """
     Converts a given number of seconds into a string indicating the remaining time.
     :param seconds: number of seconds
@@ -265,14 +274,30 @@ def dhms_time(seconds):
     return output
 
 
-def main():
+def convert_to_movie(input_path: str, movie_name: str) -> None:
+    clip = None
+    for filename in os.listdir(input_path):
+        if filename.endswith(".png"):
+            image_clip = ImageClip(os.path.join(input_path, filename))
+            if clip is None:
+                clip = image_clip
+            else:
+                clip = clip.concatenate(image_clip)
+    fps = 24
+    parent_path = os.path.abspath(os.path.join(input_path, os.pardir))
+    output_path = os.join(parent_path, f"{movie_name}.mp4")
+    clip.write_videofile(output_path, fps=fps)
+
+
+def main() -> None:
     """
-    Main function that reads the strain data, 
+    Main function that reads the strain data,
     calculates and factors in spin-weighted spherical harmonics,
-    linearly interpolates the strain to fit the mesh points, 
-    and creates .vtu mesh file for each time state of the simulation. 
+    linearly interpolates the strain to fit the mesh points,
+    and creates .tvtk mesh file for each time state of the simulation.
     The meshes represent the full superimposed waveform at the polar angle pi/2,
-    aka the same plane as the binary black hole merger.
+    aka the same plane as the binary black hole merger. At each state, the black holes
+    are moved to their respective positions and the mesh is saved as a .png file.
     """
 
     # File names
@@ -282,33 +307,32 @@ def main():
     )
     bh_file_name = "bh_synthetic.csv"
     bh_file_path = os.path.abspath(
-        os.path.join(__file__, "..", bh_file_name)
+        os.path.join(__file__, "..", "..", "..", bh_file_name)
     )
-    movie_file_name = "test"
+    movie_file_name = "synthetic_movie2"
     movie_file_path = os.path.abspath(
         os.path.join(__file__, "..", "..", "..", "movies", movie_file_name)
     )
-    if not os.path.exists(movie_file_path): # Create the directory if it doesn't exist
+    if not os.path.exists(movie_file_path):  # Create the directory if it doesn't exist
         os.makedirs(movie_file_path)
-    
 
     # Mathematical parameters
     num_radius_points = 450
     num_azi_points = 180
-    display_radius = 300 
-    R_extraction = 100
-    amplitude_scale_factor = 600 
-    omitted_radius_length = 20 
+    display_radius = 300
+    radius_of_extraction = 100
+    amplitude_scale_factor = 200
+    omitted_radius_length = 20
     colat = np.pi / 2  # colatitude angle representative of the plane of merger
 
     # Cosmetic parameters
     status_messages = True
-    save_rate = 10 # Saves every Nth frame
+    save_rate = 10  # Saves every Nth frame
     gw_color = (0.28, 0.46, 1.0)
     bh_color = (0.1, 0.1, 0.1)
-    bh1_mass = 1.24 
+    bh1_mass = 1.24
     bh2_mass = 1
-    bh_scaling_factor = 1 
+    bh_scaling_factor = 1
 
     # Import strain data
     time_array, mode_data = read_strain_files(gw_file_path)
@@ -318,7 +342,7 @@ def main():
     with open(bh_file_path, "r") as file:
         reader = csv.reader(file)
         _ = next(reader)  # skip the header row
-        bh_data = np.array([row for row in reader])
+        bh_data = np.array(list(reader))
 
     # Pre-compute theta and radius values for the mesh
     radius_values = np.linspace(0, display_radius, num_radius_points)
@@ -326,14 +350,14 @@ def main():
     rv, az = np.meshgrid(radius_values, azimuth_values, indexing="ij")
     x_values = rv * np.cos(az)
     y_values = rv * np.sin(az)
-    
+
     strain_to_mesh = (
         {}
     )  # Holds the final strain points indexed [azimuthal point (key)][time state][radius]
 
     # Apply spin-weighted spherical harmonics, superimpose modes, and interpolate to mesh points
     interpolation_times = generate_interpolation_points(
-        time_array, radius_values, R_extraction
+        time_array, radius_values, radius_of_extraction
     )
     for azi_index, azi in enumerate(azimuth_values):
         superimposed_strain = superimpose_modes_from_angle(
@@ -343,43 +367,48 @@ def main():
             interpolation_times, time_array, superimposed_strain
         )
 
-    strain_array, grid, points = initialize_tvtk_grid(
-        num_azi_points, num_radius_points
-    )
+    strain_array, grid, points = initialize_tvtk_grid(num_azi_points, num_radius_points)
 
     # Create Mayavi objects
     engine = Engine()
     engine.start()
     engine.new_scene()
     engine.scenes[0].scene.jpeg_quality = 100
-    #mlab.options.offscreen = True 
+    #mlab.options.offscreen = True
     create_gw(engine, grid, gw_color)
     bh1 = create_sphere(engine, bh1_mass * bh_scaling_factor, bh_color)
     bh2 = create_sphere(engine, bh2_mass * bh_scaling_factor, bh_color)
-    mlab.view(azimuth=60, elevation = 50, distance = 80 , focalpoint=(0,0,0)) # Initialize viewpoint
-    
-    start_time = time.time()
-    percentage = np.round(np.linspace(0, num_time_states/save_rate, 101)).astype(int)
+    mlab.view(
+        azimuth=60, elevation=50, distance=80, focalpoint=(0, 0, 0)
+    )  # Initialize viewpoint
 
-    @mlab.animate()#ui=False) This doesn't work for some reason?
+    start_time = time.time()
+    percentage = np.round(np.linspace(0, num_time_states / save_rate, 101)).astype(int)
+
+    @mlab.animate() # ui=False) This doesn't work for some reason?
     def anim():
         for state, t, row in zip(range(num_time_states), time_array, bh_data):
             if state % save_rate != 0:
                 continue
 
             # Print status messages
-            if state == 10:
+            if state == 10 * save_rate:
                 end_time = time.time()
-                eta = (end_time - start_time) * num_time_states / 10
+                eta = (end_time - start_time) * num_time_states / 10 / save_rate
                 print(
                     f"""Creating {num_time_states} frames and saving them to: 
                     {movie_file_path}\nEstimated time: {dhms_time(eta)}"""
                 )
             if status_messages and state != 0 and np.isin(state, percentage):
-                print(f" {int(state * 100 / (num_time_states - 1))}% done", end="\r")
+                eta = (time.time() - start_time) * (num_time_states - state) / state
+                print(
+                    f"{int(state * save_rate * 100 / (num_time_states - 1))}% done, ", 
+                    f"{dhms_time(eta)} remaining",
+                    end="\r",
+                )
 
             # Change the position of the black holes
-            _ = float(row[0]) # time
+            _ = float(row[0])  # time
             bh1_xyz = (float(row[1]), float(row[2]), float(row[3]))
             bh2_xyz = (float(row[4]), float(row[5]), float(row[6]))
             change_object_position(bh1, bh1_xyz)
@@ -388,8 +417,8 @@ def main():
             points.reset()
             index = 0
             for j, radius in enumerate(radius_values):
-                for i, azi in enumerate(azimuth_values):
-                    h_tR = strain_to_mesh[i][state][j].real
+                for i, _ in enumerate(azimuth_values):
+                    h_t_real = strain_to_mesh[i][state][j].real
                     x = x_values[j, i]
                     y = y_values[j, i]
                     if (
@@ -398,8 +427,8 @@ def main():
                         z = np.nan
                         strain_value = np.nan
                     else:
-                        strain_value = h_tR * amplitude_scale_factor
-                        z = strain_value 
+                        strain_value = h_t_real * amplitude_scale_factor
+                        z = strain_value
                     points.insert_next_point(x, y, z)
                     strain_array.set_tuple1(index, strain_value)
                     index += 1
@@ -408,25 +437,33 @@ def main():
             grid.modified()
 
             mlab.view(
-                azimuth= min(60 + state*0.018, 78), 
-                elevation = max(50 - state*0.016, 34),
-                distance = min(80 + state*0.35, 430) 
+                #azimuth=min(60 + state * 0.018, 78),
+                elevation=max(50 - state * 0.016, 34),
+                distance= 80 if state/save_rate < 200 else min(80 + (state - 200 * save_rate) * 0.175, 430),
+                focalpoint=(0, 0, 0),
             )
 
             # Save the frame
-            frame_path = os.path.join(movie_file_path, f"{movie_file_name}{state:05d}.png")
+            frame_num = int(state/save_rate)
+            frame_path = os.path.join(
+                movie_file_path, f"frame_{frame_num:05d}.png"
+            )
             mlab.savefig(frame_path)
 
-            if state == num_time_states - 1:
+            if state == int(num_time_states / save_rate) - 1: # Smoothly exit the program
                 total_time = time.time() - start_time
-                print(f" {int(state * 100 / (num_time_states - 1))}% done", end="\r")
-                print(f"\nSaved {num_time_states} frames to {movie_file_path} in {dhms_time(total_time)}.")
-                exit(0)
+                print(f"Done", end="\r")
+                print(
+                    f"\nSaved {num_time_states} frames to {movie_file_path} ",
+                    f"in {dhms_time(total_time)}."
+                )
+                convert_to_movie(movie_file_path, movie_file_name)
+                exit()
             yield
-    
+
     anim()
-    mlab.show()    
-                
+    mlab.show()
+
 
 if __name__ == "__main__":
     main()
