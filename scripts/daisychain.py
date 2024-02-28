@@ -2,8 +2,7 @@ import sys
 import os
 import time as mod_time
 from typing import Dict, List, Tuple, Any
-
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import curve_fit
@@ -232,7 +231,7 @@ def psi4_phase_and_amplitude(
     return time, amplitudes, cum_phase, cum_phase_dt
 
 
-def intercept_of_quadratic_fit(
+def quad_fit_intercept(
     time: NDArray[np.float64], data: NDArray[np.float64]
 ) -> float:
     """
@@ -298,12 +297,12 @@ def extract_min_omega_ell2_m2(
         filename = f"Rpsi4_r{EXT_RAD:06.1f}_ell2_m2_phase_amp_omega.txt"
         arrays_to_txt(labels, collection, filename, OUTPUT_DIR)
         print(f"Time, Amplitude, Phase, and Omega from l=m=2 data saved to {filename}")
-        # plt.plot()
-        # plt.show()
-    return intercept_of_quadratic_fit(time, angular_frequency)
+        #plt.plot()
+        #plt.show()
+    return quad_fit_intercept(time, angular_frequency)
 
 
-def psi4_fft_to_strain() -> np.ndarray:
+def psi4_fft_to_strain():
     """
     Calculates the strain modes from PSI4 data using FFT.
 
@@ -340,11 +339,11 @@ def psi4_fft_to_strain() -> np.ndarray:
         for m in range(-l, l + 1):
             # Apply FFT and filter, see Eq. 27 in https://arxiv.org/abs/1006.1632
             fft_result = np.fft.fft(psi4_modes_data[get_index_from_modes(l, m)])
-            for i, omega in enumerate(freq_list):
-                if np.fabs(omega) <= np.fabs(freq_cutoff):
+            for i, freq in enumerate(freq_list):
+                if np.fabs(freq) <= np.fabs(freq_cutoff):
                     fft_result[i] *= 1 / (1j * freq_cutoff) ** 2
                 else:
-                    fft_result[i] *= 1 / (1j * omega) ** 2
+                    fft_result[i] *= 1 / (1j * freq) ** 2
             # Inverse FFT to get strain
             strain_modes[mode_idx] = np.fft.ifft(fft_result)
 
@@ -352,10 +351,12 @@ def psi4_fft_to_strain() -> np.ndarray:
             strain_modes_ddot[mode_idx] = second_time_derivative(
                 time_arr, strain_modes[mode_idx]
             )
-            # plt.plot(time_arr, mode_data[mode_idx] - strain_modes_ddot[mode_idx])
             labels.append(f"(l={l} m={m})")
             mode_idx += 1
-        # plt.show()
+    plt.plot(time_arr, (psi4_modes_data[get_index_from_modes(4,0)].real), label = f"psi4 (4,0)")
+    plt.plot(time_arr, (strain_modes_ddot[get_index_from_modes(4,0)].real), label=f"strain_ddot(4,0)")
+    plt.legend()
+    plt.show()
     # Save the strain output to a file with _conv_to_strain.txt extension
     arrays_to_txt(labels, np.concatenate(([time_arr],strain_modes)), "psi4_conv_to_strain.csv", OUTPUT_DIR)
     print(f"Unweighted Strain Modes saved to {OUTPUT_DIR}/psi4_conv_to_strain.csv")
@@ -374,12 +375,13 @@ def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
     :return: a complex valued numpy array of the superimposed wave
     """
     quat_arr = quaternionic.array.from_spherical_coordinates(colat, azi)
-    winger = spherical.Wigner(ELL_MAX, ELL_MIN)
-    # Create an swsh array shaped like (n_modes, n_quaternions)
-    swsh_arr = winger.sYlm(S_MODE, quat_arr).T
+    wigner = spherical.Wigner(ELL_MAX, ELL_MIN)
+    # Create an spin-weighted spherical harmonic array, transposed to be shaped like (n_modes, n_quaternions)
+    swsh_arr = wigner.sYlm(S_MODE, quat_arr).T
     # mode_data has shape (n_modes, n_times), swsh_arr has shape (n_mode, n_pts).
     # Pairwise multiply and sum over modes: the result has shape (n_pts, n_times).
-    return np.sum(mode_data[:, np.newaxis, :] * swsh_arr[:, :, np.newaxis], axis=0)
+    summation = np.sum(mode_data[:, np.newaxis, :] * swsh_arr[:, :, np.newaxis], axis=0)
+    return summation
 
 
 def generate_interpolation_points(  # Could use some revisiting, currently keeps n_times constant
@@ -400,9 +402,8 @@ def generate_interpolation_points(  # Could use some revisiting, currently keeps
     time_repeated = np.repeat(time_array[np.newaxis, :], len(radius_values), axis=0)
     radius_repeated = np.repeat(radius_values[:, np.newaxis], len(time_array), axis=1)
 
-    target_times = (
-        time_repeated - radius_repeated + r_ext
-    )  # Shape is (n_radius, n_times)
+    target_times = time_repeated - radius_repeated + r_ext
+    # Shape is (n_radius, n_times)
     return np.clip(target_times, time_array.min(), time_array.max())
 
 
@@ -494,25 +495,20 @@ def gen_wave_meshes():
 
     # -----Main Loop: Iterate over all points and construct mesh
 
-    strain_vtk_arr, vtk_grid, vtk_pts, writer = initialize_vtk_grid(
-        n_azi_pts, n_rad_pts
-    )
+    strain_vtk_arr, vtk_grid, vtk_pts, writer = initialize_vtk_grid(n_azi_pts, n_rad_pts)
 
-    if STATUS_MESSAGES:
-        start_time = mod_time.time()
-        percentage = np.round(np.linspace(0, n_times, 101)).astype(int)
-
+    percentage = np.round(np.linspace(0, n_times, 101)).astype(int)
+    start_time = mod_time.time()
     for time_idx in range(n_times):
-        if STATUS_MESSAGES:
-            if time_idx == 10:
-                end_time = mod_time.time()
-                eta = (end_time - start_time) * n_times / 10
-                print(
-                    f"""Creating {n_times} meshes and saving them to: {output_directory}\nEstimated time: {int(eta / 60)} minutes"""
-                )
+        if time_idx == 10:
+            end_time = mod_time.time()
+            eta = (end_time - start_time) * n_times / 10
+            print(
+                f"""Creating {n_times} meshes and saving them to: {output_directory}\nEstimated time: {int(eta / 60)} minutes"""
+            )
 
-            if time_idx != 0 and np.isin(time_idx, percentage):
-                print(f" {int(time_idx * 100 / (n_times - 1))}% done", end="\r")
+        if STATUS_MESSAGES and time_idx != 0 and np.isin(time_idx, percentage):
+            print(f" {int(time_idx * 100 / (n_times - 1))}% done", end="\r")
 
         # Define the points and their coordinates
         vtk_pts.Reset()
@@ -551,4 +547,4 @@ if __name__ == "__main__":
         print(f"Doctest passed: All {results.attempted} test(s) passed")
 
     # Then run the main() function.
-    gen_wave_meshes()
+    psi4_fft_to_strain()
