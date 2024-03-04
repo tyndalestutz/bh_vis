@@ -6,6 +6,7 @@ moved to their respective positions and the render is saved as a .png file.
 """
 
 import os
+import sys
 import csv
 import time
 import quaternionic
@@ -20,6 +21,8 @@ from mayavi.api import Engine
 from mayavi.sources.vtk_data_source import VTKDataSource
 from mayavi.sources.parametric_surface import ParametricSurface
 from mayavi.modules.surface import Surface
+
+import util_psi4_to_strain_incl_checks as psi4_to_strain
 
 
 def read_strain_files(
@@ -40,7 +43,7 @@ def read_strain_files(
         file_name = file_path.replace("[ELLVAL]", str(ell))
         with open(file_name, "r", encoding="utf-8") as file:
             # Read lines that don't start with '#'
-            print(file_name)
+            print(f"Reading strain data from {file_name}")
             lines = [line for line in file.readlines() if not line.startswith("#")]
 
         # Convert lines to arrays and sort by time
@@ -82,12 +85,18 @@ def find_swsh_factor(colat: float, azi: float, ell: int, em: int) -> Any:
     :param ell: wave mode value l
     :param em: wave mode value m
     :return: a complex valued spin-weighted spherical harmonic factor
+
+    >>> find_swsh_factor(np.pi/2, 0, 5, 0)
+    (-0+0j)
+    >>> find_swsh_factor(np.pi/2, 5*np.pi/7, 2, 2)
+    (-0.035090612830967316-0.15374202011569824j)
     """
     s = -2
     R = quaternionic.array.from_spherical_coordinates(colat, azi)
     winger = spherical.Wigner(8)  # Create a Winger matrix for all modes from l=2 to l=8
     Y = winger.sYlm(s, R)
     swsh_factor = Y[winger.Yindex(ell, em)]
+
     return swsh_factor
 
 
@@ -106,6 +115,14 @@ def superimpose_modes_from_angle(
     :param num_time_states: number of time states in the strain data
     :param mode_data: dictionary containing strain data for all the modes
     :return: a complex valued numpy array of the superimposed wave
+    
+    >>> mode_data = {}
+    >>> for l in range(2, 9):
+    ...     for m in range(-l, l+1):
+    ...         mode_data[(l, m)] = np.array([1+1j, 2+3j, 4+5j])
+    >>> superimpose_modes_from_angle(np.pi/2, 0, 3, mode_data)
+    array([ 4.69306041 +4.69306041j,  9.38612083+14.07918124j,
+           18.77224166+23.46530207j])
     """
     summation: NDArray[np.int64] = np.zeros(num_time_states, dtype="complex128")
     for ell in range(2, 9):
@@ -300,18 +317,29 @@ def main() -> None:
     are moved to their respective positions and the mesh is saved as a .png file.
     """
 
+    if len(sys.argv) != 3:
+        raise RuntimeError(
+            """Please include path to psi4 folder data as well as the extraction radius of that data.
+            Usage: python3 <script name> <path to psi4 folder> <extraction radius (r/M) (4 digits, e.g. 0100)>"""
+        )
+    psi4_folder_path = str(sys.argv[1])
+    radius_of_extraction = int(sys.argv[2])
+    #print(f"EXTRACTION RADIUS: {float(radius_of_extraction)}")
+    # Convert psi4 data to strain using imported script
+    psi4_to_strain.main()
+    
     # File names
     gw_file_name = "Rpsi4_r0100.0_l[ELLVAL]_conv_to_strain.txt"
     gw_file_path = os.path.abspath(
-        os.path.join(__file__, "..", "..", "r100", gw_file_name)
+        os.path.join(psi4_folder_path, gw_file_name)
     )
     bh_file_name = "bh_synthetic.csv"
     bh_file_path = os.path.abspath(
-        os.path.join(__file__, "..", "..", "..", bh_file_name)
+        os.path.join(__file__, "..", bh_file_name)
     )
     movie_file_name = "synthetic_movie2"
     movie_file_path = os.path.abspath(
-        os.path.join(__file__, "..", "..", "..", "movies", movie_file_name)
+        os.path.join(__file__, "..", "..", "movies", movie_file_name)
     )
     if not os.path.exists(movie_file_path):  # Create the directory if it doesn't exist
         os.makedirs(movie_file_path)
@@ -320,7 +348,7 @@ def main() -> None:
     num_radius_points = 450
     num_azi_points = 180
     display_radius = 300
-    radius_of_extraction = 100
+    #radius_of_extraction = 100
     amplitude_scale_factor = 200
     omitted_radius_length = 20
     colat = np.pi / 2  # colatitude angle representative of the plane of merger
@@ -351,6 +379,8 @@ def main() -> None:
     x_values = rv * np.cos(az)
     y_values = rv * np.sin(az)
 
+    print("""**************************************************
+Constructing mesh points in 3D...""")
     strain_to_mesh = (
         {}
     )  # Holds the final strain points indexed [azimuthal point (key)][time state][radius]
@@ -369,6 +399,8 @@ def main() -> None:
 
     strain_array, grid, points = initialize_tvtk_grid(num_azi_points, num_radius_points)
 
+    print("""**************************************************
+Processing completed, beginning animation in Mayavi...""")
     # Create Mayavi objects
     engine = Engine()
     engine.start()
@@ -384,7 +416,6 @@ def main() -> None:
 
     start_time = time.time()
     percentage = np.round(np.linspace(0, num_time_states / save_rate, 101)).astype(int)
-
     @mlab.animate() # ui=False) This doesn't work for some reason?
     def anim():
         for state, t, row in zip(range(num_time_states), time_array, bh_data):
@@ -450,20 +481,44 @@ def main() -> None:
             )
             mlab.savefig(frame_path)
 
-            if state == int(num_time_states / save_rate) - 1: # Smoothly exit the program
+            if state == num_time_states // save_rate * save_rate: # checks for last saved state
                 total_time = time.time() - start_time
                 print(f"Done", end="\r")
                 print(
                     f"\nSaved {num_time_states} frames to {movie_file_path} ",
                     f"in {dhms_time(total_time)}."
                 )
-                convert_to_movie(movie_file_path, movie_file_name)
-                exit()
+                #print("converting to movie...")
+                #convert_to_movie(movie_file_path, movie_file_name)
+                exit() # exit after converting to .mp4
             yield
-
-    anim()
+    
+    animation = anim()
     mlab.show()
 
 
 if __name__ == "__main__":
+    # run doctests first
+    import doctest
+
+    results = doctest.testmod()
+    psi4_to_strain_results = doctest.testmod(psi4_to_strain)
+
+    if psi4_to_strain_results.failed > 0:
+        print(
+            f"""Doctest in {psi4_to_strain} failed:
+{psi4_to_strain_results.failed} of {psi4_to_strain_results.attempted} test(s) passed"""
+        )
+        sys.exit(1)
+    else:
+        print(f"""Doctest in {psi4_to_strain} passed:
+All {psi4_to_strain_results.attempted} test(s) passed""")
+
+    if results.failed > 0:
+        print(f"Doctest failed: {results.failed} of {results.attempted} test(s) passed")
+        sys.exit(1)
+    else:
+        print(f"Doctest passed: All {results.attempted} test(s) passed")
+
+    # run main() after tests
     main()
