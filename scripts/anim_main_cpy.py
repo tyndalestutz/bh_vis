@@ -1,9 +1,9 @@
 import os
 import csv
 import time
-import vtk  # Even though we don't use it directly, TVTK requires it
-from tvtk.api import tvtk
 from typing import Tuple, Dict, Any
+import vtk  # Unused, but Required by TVTK.
+from tvtk.api import tvtk
 import numpy as np
 from numpy.typing import NDArray
 import quaternionic
@@ -14,6 +14,9 @@ from mayavi.sources.vtk_data_source import VTKDataSource
 from mayavi.sources.parametric_surface import ParametricSurface
 from mayavi.modules.surface import Surface
 
+ELL_MAX = 8
+ELL_MIN = 2
+S_MODE = -2
 
 def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
     """
@@ -66,8 +69,16 @@ def initialize_tvtk_grid(num_azi, num_radius):
     :param num_azi: number of azimuthal points on the mesh
     :param num_radius: number of radial points on the mesh
     :returns: tvtk.api.DataArray(),
-             tvtkUnstructuredGrid(),
-             tvtkPoints()
+              tvtkUnstructuredGrid(),
+              tvtkPoints()
+
+    >>> strain_array, grid, points = initialize_tvtk_grid(3, 4)
+    >>> isinstance(strain_array, tvtk.api.DataArray)
+    True
+    >>> isinstance(grid, tvtk.UnstructuredGrid)
+    True
+    >>> isinstance(points, tvtk.Points)
+    True
     """
     # Create tvtk objects
     points = tvtk.Points()
@@ -98,7 +109,9 @@ def initialize_tvtk_grid(num_azi, num_radius):
     return strain_array, grid, points
 
 
-def create_gw(engine, grid, color):
+def create_gw(
+    engine: Engine, grid: tvtk.UnstructuredGrid, color: tuple[float, float, float]
+):
     scene = engine.scenes[0]
     gw = VTKDataSource(data=grid)
     engine.add_source(gw, scene)
@@ -253,7 +266,7 @@ def main():
     n_times = len(time_array)
 
     # Import black hole data
-    with open(bh_file_path, "r") as file:
+    with open(bh_file_path, mode="r", encoding="utf-8") as file:
         reader = csv.reader(file)
         _ = next(reader)  # skip the header row
         bh_data = np.array([row for row in reader])
@@ -306,7 +319,7 @@ def main():
                 print(
                     f"""Creating {n_times} meshes and saving them to: {movie_file_path}\nEstimated time: {dhms_time(eta)} minutes"""
                 )
-                
+
             if status_messages and time_idx != 0 and np.isin(time_idx, percentage):
                 print(f" {int(time_idx * 100 / (n_times - 1))}% done", end="\r")
 
@@ -324,15 +337,16 @@ def main():
                     x = x_values[j, i]
                     y = y_values[j, i]
                     # Introduce a discontinuity to make room for the Black Holes
-                    if radius <= omitted_radius_length:
-                        strain_value = np.nan
-                    else:
-                        strain_value = strain_to_mesh[i][time_idx][j].real
+                    strain_value = (
+                        np.nan
+                        if radius <= omitted_radius_length
+                        else strain_to_mesh[i][time_idx][j].real
+                    )
                     z = strain_value * amplitude_scale_factor
                     points.insert_next_point(x, y, z)
                     strain_array.set_tuple1(index, strain_value)
                     index += 1
-                    
+
             grid._set_points(points)
             grid._get_point_data().add_array(strain_array)
             grid.modified()
@@ -344,7 +358,9 @@ def main():
             )
 
             # Save the frame
-            frame_path = os.path.join(movie_file_path, f"{movie_file_name}{time_idx:05d}.png")
+            frame_path = os.path.join(
+                movie_file_path, f"{movie_file_name}{time_idx:05d}.png"
+            )
             mlab.savefig(frame_path)
 
             if time_idx == n_times - 1:
@@ -361,4 +377,13 @@ def main():
 
 
 if __name__ == "__main__":
+    import doctest
+
+    results = doctest.testmod()
+    if results.failed > 0:
+        print(f"Doctest failed: {results.failed} of {results.attempted} test(s)")
+        exit(1)
+    else:
+        print(f"Doctest passed: All {results.attempted} test(s) passed")
+
     main()

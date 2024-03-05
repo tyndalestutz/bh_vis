@@ -129,39 +129,39 @@ def generate_interpolation_points(time_array: NDArray[np.float64], radius_values
 
 
 def initialize_tvtk_grid(num_azi, num_radius):
-   """
-   Sets initial parameters for the mesh generation module and returns
-   mesh manipulation objects to write and save data.
+    """
+    Sets initial parameters for the mesh generation module and returns
+    mesh manipulation objects to write and save data.
 
-   :param num_azi: number of azimuthal points on the mesh
-   :param num_radius: number of radial points on the mesh
-   :returns: tvtk.api.DataArray(),
-            tvtkUnstructuredGrid(),
-            tvtkPoints()
-   """
-   # Create tvtk objects
-   points = tvtk.Points()
-   grid = tvtk.UnstructuredGrid()
-   strain_array = tvtk.FloatArray(
-      name="Strain", number_of_components=1, number_of_tuples=num_azi * num_radius
-   )
+    :param num_azi: number of azimuthal points on the mesh
+    :param num_radius: number of radial points on the mesh
+    :returns: tvtk.api.DataArray(),
+              tvtkUnstructuredGrid(),
+              tvtkPoints()
+    """
+    # Create tvtk objects
+    points = tvtk.Points()
+    grid = tvtk.UnstructuredGrid()
+    strain_array = tvtk.FloatArray(
+        name="Strain", number_of_components=1, number_of_tuples=num_azi * num_radius
+    )
 
-   # Create cells
-   cell_array = tvtk.CellArray()
-   for j in range(num_radius - 1):
-      for i in range(num_azi):
-         cell = tvtk.Quad()
-         point_ids = [i + j * num_azi, (i + 1) % num_azi + j * num_azi,
-            (i + 1) % num_azi + (j + 1) * num_azi, i + (j + 1) * num_azi]
-         for idx, pid in enumerate(point_ids): 
-               cell.point_ids.set_id(idx, pid)
-         cell_array.insert_next_cell(cell)
+    # Create cells
+    cell_array = tvtk.CellArray()
+    for j in range(num_radius - 1):
+        for i in range(num_azi):
+            cell = tvtk.Quad()
+            point_ids = [i + j * num_azi, (i + 1) % num_azi + j * num_azi,
+                (i + 1) % num_azi + (j + 1) * num_azi, i + (j + 1) * num_azi]
+            for idx, pid in enumerate(point_ids):
+                cell.point_ids.set_id(idx, pid)
+            cell_array.insert_next_cell(cell)
 
-   # Set grid properties
-   #grid.points = points
-   grid.set_cells(tvtk.Quad().cell_type, cell_array) 
+    # Set grid properties
+    #grid.points = points
+    grid.set_cells(tvtk.Quad().cell_type, cell_array)
 
-   return strain_array, grid, points
+    return strain_array, grid, points
 
 
 def create_gw(engine, grid, color):

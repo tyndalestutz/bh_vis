@@ -535,7 +535,7 @@ def gen_wave_meshes():
 
 
 if __name__ == "__main__":
-    # First run doctests
+
     import doctest
 
     results = doctest.testmod()
@@ -546,5 +546,5 @@ if __name__ == "__main__":
     else:
         print(f"Doctest passed: All {results.attempted} test(s) passed")
 
-    # Then run the main() function.
+
     psi4_fft_to_strain()
