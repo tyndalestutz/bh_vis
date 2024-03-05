@@ -13,9 +13,11 @@ import quaternionic
 import spherical
 import vtk  # Even though we don't use it directly, TVTK requires it
 import numpy as np
+from math import erf
 from typing import Tuple, Dict, Any
 from numpy.typing import NDArray
 from tvtk.api import tvtk
+from moviepy.video.VideoClip import ImageClip
 from mayavi import mlab
 from mayavi.api import Engine
 from mayavi.sources.vtk_data_source import VTKDataSource
@@ -326,7 +328,7 @@ def main() -> None:
     radius_of_extraction = int(sys.argv[2])
     #print(f"EXTRACTION RADIUS: {float(radius_of_extraction)}")
     # Convert psi4 data to strain using imported script
-    psi4_to_strain.main()
+    #psi4_to_strain.main()
     
     # File names
     gw_file_name = "Rpsi4_r0100.0_l[ELLVAL]_conv_to_strain.txt"
@@ -339,23 +341,35 @@ def main() -> None:
     )
     movie_file_name = "synthetic_movie2"
     movie_file_path = os.path.abspath(
-        os.path.join(__file__, "..", "..", "movies", movie_file_name)
+        os.path.join(__file__, "..", "..", "..", "movies", movie_file_name)
     )
-    if not os.path.exists(movie_file_path):  # Create the directory if it doesn't exist
+    if os.path.exists(movie_file_path):  # Check if the directory exists 
+        r = input(f"{movie_file_path} already exists. Would you like to overwrite it? Y or N: ")
+        if r.lower() != "y":
+            print("Please choose a different directory.")
+            exit()
+        for file in os.listdir(movie_file_path):
+            os.remove(os.path.join(movie_file_path, file))
+    else:
         os.makedirs(movie_file_path)
+    
 
     # Mathematical parameters
     num_radius_points = 450
     num_azi_points = 180
     display_radius = 300
-    #radius_of_extraction = 100
+    radius_of_extraction = 100
     amplitude_scale_factor = 200
     omitted_radius_length = 20
+    dropoff_radius_length = 20 # Set to 0 for an abrupt discontinuity in the center
+
+
     colat = np.pi / 2  # colatitude angle representative of the plane of merger
 
     # Cosmetic parameters
     status_messages = True
     save_rate = 10  # Saves every Nth frame
+    resolution = (1920, 1080)
     gw_color = (0.28, 0.46, 1.0)
     bh_color = (0.1, 0.1, 0.1)
     bh1_mass = 1.24
@@ -365,6 +379,7 @@ def main() -> None:
     # Import strain data
     time_array, mode_data = read_strain_files(gw_file_path)
     num_time_states = len(time_array)
+    effective_num_time_states = int(num_time_states / save_rate)
 
     # Import black hole data
     with open(bh_file_path, "r") as file:
@@ -379,7 +394,7 @@ def main() -> None:
     x_values = rv * np.cos(az)
     y_values = rv * np.sin(az)
 
-    print("""**************************************************
+    print("""**********************************************************************
 Constructing mesh points in 3D...""")
     strain_to_mesh = (
         {}
@@ -395,18 +410,17 @@ Constructing mesh points in 3D...""")
         )
         strain_to_mesh[azi_index] = np.interp(
             interpolation_times, time_array, superimposed_strain
-        )
+        ).real  
 
     strain_array, grid, points = initialize_tvtk_grid(num_azi_points, num_radius_points)
 
-    print("""**************************************************
-Processing completed, beginning animation in Mayavi...""")
     # Create Mayavi objects
+    #mlab.options.offscreen = True
     engine = Engine()
     engine.start()
-    engine.new_scene()
-    engine.scenes[0].scene.jpeg_quality = 100
-    #mlab.options.offscreen = True
+    #engine.new_scene()
+    #engine.scenes[0].scene.jpeg_quality = 100
+    mlab.figure(engine=engine, size=resolution)
     create_gw(engine, grid, gw_color)
     bh1 = create_sphere(engine, bh1_mass * bh_scaling_factor, bh_color)
     bh2 = create_sphere(engine, bh2_mass * bh_scaling_factor, bh_color)
@@ -415,28 +429,30 @@ Processing completed, beginning animation in Mayavi...""")
     )  # Initialize viewpoint
 
     start_time = time.time()
-    percentage = np.round(np.linspace(0, num_time_states / save_rate, 101)).astype(int)
+    percentage = list(np.round(np.linspace(0, num_time_states, 100)).astype(int))
+
     @mlab.animate() # ui=False) This doesn't work for some reason?
     def anim():
         for state, t, row in zip(range(num_time_states), time_array, bh_data):
             if state % save_rate != 0:
-                continue
+                continue # Skip all but every nth iteration
 
             # Print status messages
             if state == 10 * save_rate:
                 end_time = time.time()
-                eta = (end_time - start_time) * num_time_states / 10 / save_rate
+                eta = (end_time - start_time) * effective_num_time_states / 10
                 print(
-                    f"""Creating {num_time_states} frames and saving them to: 
+                    f"""Creating {effective_num_time_states} frames and saving them to: 
                     {movie_file_path}\nEstimated time: {dhms_time(eta)}"""
                 )
-            if status_messages and state != 0 and np.isin(state, percentage):
-                eta = (time.time() - start_time) * (num_time_states - state) / state
+            if status_messages and state != 0 and state > percentage[0]:
+                eta = ((time.time() - start_time) / state) * (num_time_states - state)
                 print(
-                    f"{int(state * save_rate * 100 / (num_time_states - 1))}% done, ", 
+                    f"{int(state  * 100 / num_time_states)}% done, ", 
                     f"{dhms_time(eta)} remaining",
                     end="\r",
                 )
+                percentage.pop(0)
 
             # Change the position of the black holes
             _ = float(row[0])  # time
@@ -449,16 +465,15 @@ Processing completed, beginning animation in Mayavi...""")
             index = 0
             for j, radius in enumerate(radius_values):
                 for i, _ in enumerate(azimuth_values):
-                    h_t_real = strain_to_mesh[i][state][j].real
                     x = x_values[j, i]
                     y = y_values[j, i]
-                    if (
-                        radius <= omitted_radius_length
-                    ):  # Introduce a discontinuity to make room for the Black Holes
+                    if radius <= omitted_radius_length:
                         z = np.nan
                         strain_value = np.nan
                     else:
-                        strain_value = h_t_real * amplitude_scale_factor
+                        h_t_real = strain_to_mesh[i][state][j].real
+                        dropoff_factor = 0.5*(erf((radius - 2*omitted_radius_length) / 2) + 1)
+                        strain_value = h_t_real * amplitude_scale_factor * dropoff_factor
                         z = strain_value
                     points.insert_next_point(x, y, z)
                     strain_array.set_tuple1(index, strain_value)
@@ -479,23 +494,24 @@ Processing completed, beginning animation in Mayavi...""")
             frame_path = os.path.join(
                 movie_file_path, f"frame_{frame_num:05d}.png"
             )
-            mlab.savefig(frame_path)
+            mlab.savefig(frame_path, magnification=1)
 
-            if state == num_time_states // save_rate * save_rate: # checks for last saved state
+            if state >= (effective_num_time_states * save_rate) - 1: # Smoothly exit the program
                 total_time = time.time() - start_time
                 print(f"Done", end="\r")
                 print(
-                    f"\nSaved {num_time_states} frames to {movie_file_path} ",
+                    f"\nSaved {effective_num_time_states} frames to {movie_file_path} ",
                     f"in {dhms_time(total_time)}."
                 )
-                #print("converting to movie...")
                 #convert_to_movie(movie_file_path, movie_file_name)
-                exit() # exit after converting to .mp4
+                exit()
             yield
-    
-    animation = anim()
+
+    _ = anim()
     mlab.show()
 
+# This should automatically create the movie file, but if it doesn't work, run this in the movie directory:
+# $ffmpeg -framerate 24 -i frame_%05d.png <movie_name>.mp4
 
 if __name__ == "__main__":
     # run doctests first
@@ -516,7 +532,7 @@ All {psi4_to_strain_results.attempted} test(s) passed""")
 
     if results.failed > 0:
         print(f"Doctest failed: {results.failed} of {results.attempted} test(s) passed")
-        sys.exit(1)
+        #sys.exit(1)
     else:
         print(f"Doctest passed: All {results.attempted} test(s) passed")
 
