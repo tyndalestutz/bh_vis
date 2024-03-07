@@ -208,12 +208,14 @@ def create_gw(
     engine: Engine,
     grid: Any,
     color: Tuple[float, float, float],
+    wireframe: bool = False
 ) -> None:
     """
     Creates and displays a gravitational wave strain from a given grid.
     :param engine: Mayavi engine
     :param grid: tvtk.UnstructuredGrid
     :param color: color of the strain in a tuple ranging from (0, 0, 0) to (1, 1, 1)
+    :param wireframe: whether to display the strain as a wireframe or a surface
     """
 
     scene = engine.scenes[0]
@@ -223,6 +225,11 @@ def create_gw(
     engine.add_filter(s, gw)
     s.actor.mapper.scalar_visibility = False
     s.actor.property.color = color
+    if wireframe:
+        s.actor.property.representation = "wireframe"
+        s.actor.property.color = (0, 0, 0)
+        s.actor.property.line_width = 0.005
+        s.actor.property.opacity = 0.5
 
 
 def create_sphere(
@@ -361,13 +368,12 @@ def main() -> None:
     radius_of_extraction = 100
     amplitude_scale_factor = 200
     omitted_radius_length = 20
-    dropoff_radius_length = 20 # Set to 0 for an abrupt discontinuity in the center
-
 
     colat = np.pi / 2  # colatitude angle representative of the plane of merger
 
     # Cosmetic parameters
     status_messages = True
+    wireframe = True
     save_rate = 10  # Saves every Nth frame
     resolution = (1920, 1080)
     gw_color = (0.28, 0.46, 1.0)
@@ -422,6 +428,8 @@ Constructing mesh points in 3D...""")
     #engine.scenes[0].scene.jpeg_quality = 100
     mlab.figure(engine=engine, size=resolution)
     create_gw(engine, grid, gw_color)
+    if wireframe:
+        create_gw(engine, grid, gw_color, wireframe=True)
     bh1 = create_sphere(engine, bh1_mass * bh_scaling_factor, bh_color)
     bh2 = create_sphere(engine, bh2_mass * bh_scaling_factor, bh_color)
     mlab.view(
@@ -471,8 +479,10 @@ Constructing mesh points in 3D...""")
                         z = np.nan
                         strain_value = np.nan
                     else:
-                        h_t_real = strain_to_mesh[i][state][j].real
-                        dropoff_factor = 0.5*(erf((radius - 2*omitted_radius_length) / 2) + 1)
+                        h_t_real = strain_to_mesh[i][state][j]
+                        dropoff_radius = 1.5 * omitted_radius_length
+                        width = 0.5 * omitted_radius_length
+                        dropoff_factor = 0.5*(erf((radius - dropoff_radius) / width) + 1)
                         strain_value = h_t_real * amplitude_scale_factor * dropoff_factor
                         z = strain_value
                     points.insert_next_point(x, y, z)
