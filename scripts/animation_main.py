@@ -1,20 +1,34 @@
+"""
+A script that reads in gravitational wave strain data and black hole positional data,
+applies spin-weighted spherical harmonics to the data, and creates a Mayavi animation
+of the black holes and their gravitational waves. At each state, the black holes are 
+moved to their respective positions and the render is saved as a .png file.
+"""
+
 import os
+import sys
 import csv
+import cv2
 import time
-import vtk  # Unused, but Required by TVTK.
-from tvtk.api import tvtk
+from math import erf
+from typing import Tuple, Dict, Any
 import numpy as np
 from numpy.typing import NDArray
+from scipy.interpolate import interp1d
 import quaternionic
 import spherical
+import vtk  # Unused, but Required by TVTK.
+from tvtk.api import tvtk
 from mayavi import mlab
 from mayavi.api import Engine
 from mayavi.sources.vtk_data_source import VTKDataSource
 from mayavi.sources.parametric_surface import ParametricSurface
 from mayavi.modules.surface import Surface
-import psi4_FFI_to_strain
+import psi4_FFI_to_strain as psi4strain
+
 
 BH_DIR = ""
+MOVIE_DIR = ""
 ELL_MAX = 8
 ELL_MIN = 2
 S_MODE = -2
@@ -27,8 +41,7 @@ def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
 
     :param colat: colatitude angle for the SWSH factor
     :param azi: azimuthal angle for the SWSH factor
-    :param n_times: number of time time_idxs in the strain data
-    :param mode_data: dictionary containing strain data for all the modes
+    :param mode_data: numpy array containing strain data for all the modes
     :return: a complex valued numpy array of the superimposed wave
     """
     quat_arr = quaternionic.array.from_spherical_coordinates(colat, azi)
@@ -65,17 +78,38 @@ def generate_interpolation_points(  # Could use some revisiting, currently keeps
     return filtered_target_times
 
 
-def initialize_tvtk_grid(num_azi, num_radius):
+def interpolate_coords_by_time(
+    og_time_array: NDArray[np.float64], 
+    e1: NDArray[np.float64], 
+    e2: NDArray[np.float64],
+    e3: NDArray[np.float64],
+    new_time_array: float) -> Tuple:
+    """
+    Interpolates the 3D coordinates to the given time state.
+    :param og_time_array: original time array
+    :param e1: first coordinate array
+    :param e2: second coordinate array
+    :param e3: third coordinate array
+    :param new_time_array: new time array
+    :return: interpolated 3D coordinates
+    """
+
+    new_e1 = interp1d(og_time_array, e1, kind="linear", fill_value="extrapolate")(new_time_array)
+    new_e2 = interp1d(og_time_array, e2, kind="linear", fill_value="extrapolate")(new_time_array)
+    new_e3 = interp1d(og_time_array, e3, kind="linear", fill_value="extrapolate")(new_time_array)
+    return new_e1, new_e2, new_e3
+
+
+def initialize_tvtk_grid(num_azi: int, num_radius: int) -> Tuple:
     """
     Sets initial parameters for the mesh generation module and returns
-    mesh manipulation objects to write and save data.
+    a circular, polar mesh with manipulation objects to write and save data.
 
     :param num_azi: number of azimuthal points on the mesh
     :param num_radius: number of radial points on the mesh
-    :returns: tvtk.FloatArray(),
-              tvtkUnstructuredGrid(),
-              tvtkPoints()
-
+    :returns: tvtk.FloatArray,
+              tvtk.UnstructuredGrid,
+              tvtk.Points
     >>> strain_array, grid, points = initialize_tvtk_grid(3, 4)
     >>> isinstance(strain_array, tvtk.FloatArray)
     True
@@ -84,6 +118,7 @@ def initialize_tvtk_grid(num_azi, num_radius):
     >>> isinstance(points, tvtk.Points)
     True
     """
+
     # Create tvtk objects
     points = tvtk.Points()
     grid = tvtk.UnstructuredGrid()
@@ -105,16 +140,26 @@ def initialize_tvtk_grid(num_azi, num_radius):
             for idx, pid in enumerate(point_ids):
                 cell.point_ids.set_id(idx, pid)
             cell_array.insert_next_cell(cell)
-
     # Set grid properties
+    # grid.points = points
     grid.set_cells(tvtk.Quad().cell_type, cell_array)
 
     return strain_array, grid, points
 
 
 def create_gw(
-    engine: Engine, grid: tvtk.UnstructuredGrid, color: tuple[float, float, float]
-):
+    engine: Engine,
+    grid: Any,
+    color: Tuple[float, float, float],
+    wireframe: bool = False
+) -> None:
+    """
+    Creates and displays a gravitational wave strain from a given grid.
+    :param engine: Mayavi engine
+    :param grid: tvtk.UnstructuredGrid
+    :param color: color of the strain in a tuple ranging from (0, 0, 0) to (1, 1, 1)
+    :param wireframe: whether to display the strain as a wireframe or a surface
+    """
     scene = engine.scenes[0]
     gw = VTKDataSource(data=grid)
     engine.add_source(gw, scene)
@@ -122,14 +167,18 @@ def create_gw(
     engine.add_filter(s, gw)
     s.actor.mapper.scalar_visibility = False
     s.actor.property.color = color
-    return
+    if wireframe:
+        s.actor.property.representation = "wireframe"
+        s.actor.property.color = (0, 0, 0)
+        s.actor.property.line_width = 0.005
+        s.actor.property.opacity = 0.5
 
 
 def create_sphere(
     engine: Engine, radius: float = 1, color: tuple[float, float, float] = (1, 0, 0)
-):
+) -> Surface:
     """
-    Creates and displays a parametric surface with the given parameters.
+    Creates and displays a spherical surface with the given parameters.
     :param engine: Mayavi engine
     :param radius: radius of the sphere
     :param color: color of the sphere in a tuple ranging from (0, 0, 0) to (1, 1, 1)
@@ -149,9 +198,9 @@ def create_sphere(
     return s
 
 
-def change_object_position(obj: Surface, position: tuple[float, float, float]):
+def change_object_position(obj: Surface, position: tuple[float, float, float]) -> None:
     """
-    Changes the Cartesian position of a Mayavi object to the given parameters.
+    Changes the Cartesian position of a Mayavi surface to the given parameters.
     :param engine: Mayavi engine
     :param obj: Mayavi object
     :param position: position of the object
@@ -191,7 +240,7 @@ def change_view(
     scene.scene.camera.compute_view_plane_normal()
 
 
-def dhms_time(seconds):
+def dhms_time(seconds: float) -> str:
     """
     Converts a given number of seconds into a string indicating the remaining time.
     :param seconds: number of seconds
@@ -224,52 +273,100 @@ def dhms_time(seconds):
     return output
 
 
-def main():
+def convert_to_movie(input_path: str, movie_name: str, fps: int = 24) -> None:
+    """
+    Converts a series of .png files into a movie using OpenCV.
+    :param input_path: path to the directory containing the .png files
+    :param movie_name: name of the movie file
+    :param fps: frames per second (24 by default)
+    """
+    frames = [f for f in os.listdir(input_path) if f.endswith(".png")]
+    frames.sort()
+    # Create a movie from the frames
+    ref = cv2.imread(os.path.join(input_path, frames[0]))
+    height, width, layers = ref.shape
+    video = cv2.VideoWriter(
+        os.path.join(input_path, f"{movie_name}.mp4"),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps,
+        (width, height)
+    )
+    for frame in frames:
+        f = cv2.imread(os.path.join(input_path, frame))
+        video.write(f)
+    video.release()
+
+
+def main() -> None:
     """
     Main function that reads the strain data,
     calculates and factors in spin-weighted spherical harmonics,
     linearly interpolates the strain to fit the mesh points,
-    and creates .vtu mesh file for each time time_idx of the simulation.
+    and creates .tvtk mesh file for each time state of the simulation.
     The meshes represent the full superimposed waveform at the polar angle pi/2,
-    aka the same plane as the binary black hole merger.
+    aka the same plane as the binary black hole merger. At each state, the black holes
+    are moved to their respective positions and the mesh is saved as a .png file.
     """
 
+    if len(sys.argv) != 3:
+        file_name = os.path.basename(__file__)
+        raise RuntimeError(
+            f"""Please include path to psi4 folder data as well as the extraction radius of that data.
+            Usage: python3 {file_name} <path to psi4 folder> <extraction radius (r/M) (4 digits, e.g. 0100)>"""
+        )
+    psi4_folder_path = str(sys.argv[1])
+    radius_of_extraction = int(sys.argv[2])
+    #print(f"EXTRACTION RADIUS: {float(radius_of_extraction)}")
+    # Convert psi4 data to strain using imported script
+    #psi4_to_strain.main()
+    
     # File names
-    bh_file_name = "bh_synthetic.csv"
+    gw_file_name = "Rpsi4_r0100.0_l[ELLVAL]_conv_to_strain.txt"
+    gw_file_path = os.path.join(psi4_folder_path, gw_file_name)
+    
+    bh_file_name = "puncture_posns_vels_regridxyzU.txt"
     bh_file_path = os.path.join(BH_DIR, bh_file_name)
-    movie_file_name = "test"
-    movie_file_path = os.path.join(BH_DIR, "movies", movie_file_name)
-
-    if not os.path.exists(movie_file_path):  # Create the directory if it doesn't exist
+    movie_file_name = "first_real_movie"
+    movie_file_path = os.path.join(MOVIE_DIR, movie_file_name)
+    
+    if os.path.exists(movie_file_path):  # Check if the directory exists 
+        r = input(f"""{movie_file_path} already exists. Would you like to overwrite it? Y or N: """)
+        if r.lower() != "y":
+            print("Please choose a different directory.")
+            exit()
+        for file in os.listdir(movie_file_path):
+            os.remove(os.path.join(movie_file_path, file))
+    else:
         os.makedirs(movie_file_path)
-
+    
     # Mathematical parameters
-    n_rad_pts = 450
-    n_azi_pts = 180
+    num_radius_points = 450
+    num_azi_points = 180
     display_radius = 300
-    ext_rad = 100
-    amplitude_scale_factor = 600
-    omitted_radius_length = 20
+    radius_of_extraction = 100
+    amplitude_scale_factor = 200
+    omitted_radius_length = 10
+
     colat = np.pi / 2  # colatitude angle representative of the plane of merger
 
     # Cosmetic parameters
     status_messages = True
+    wireframe = True
+    frames_per_second = 24
     save_rate = 10  # Saves every Nth frame
+    resolution = (1920, 1080)
     gw_color = (0.28, 0.46, 1.0)
     bh_color = (0.1, 0.1, 0.1)
-    bh1_mass = 1.24
-    bh2_mass = 1
+    bh1_mass = 1
+    bh2_mass = 1.24 
     bh_scaling_factor = 1
 
     # Import strain data
-    time_array, mode_data = psi4_FFI_to_strain.psi4_ffi_to_strain()
+    time_array, mode_data = psi4strain.psi4_ffi_to_strain()
     n_times = len(time_array)
+    
+    n_frames = int(n_times / save_rate)
 
-    # Import black hole data
-    with open(bh_file_path, mode="r", encoding="utf-8") as file:
-        reader = csv.reader(file)
-        _ = next(reader)  # skip the header row
-        bh_data = np.array([row for row in reader])
 
     # Pre-compute theta and radius values for the mesh
     radius_values = np.linspace(0, display_radius, n_rad_pts)
@@ -279,9 +376,13 @@ def main():
     x_values = rv * np.cos(az)
     y_values = rv * np.sin(az)
 
+    print("""**********************************************************************
+Constructing mesh points in 3D...""")
+    # Holds the final strain points indexed [azimuthal point (key)][time state][radius]
+    strain_to_mesh = {}
     # Apply spin-weighted spherical harmonics, superimpose modes, and interpolate to mesh points
     strain_to_mesh = np.zeros((n_rad_pts, n_azi_pts, n_times))
-
+    
     strain_azi = swsh_summation_angles(colat, azimuth_values, mode_data).real
 
     lerp_times = generate_interpolation_points(time_array, radius_values, ext_rad)
@@ -290,13 +391,36 @@ def main():
 
     strain_array, grid, points = initialize_tvtk_grid(n_azi_pts, n_rad_pts)
 
+    # Import black hole data
+    if bh1_mass > bh2_mass:
+        (bh1_mass, bh2_mass) = (bh2_mass, bh1_mass) # Swap the masses so that the heavier black hole is bh2
+    with open(bh_file_path, mode="r", encoding="utf-8") as file:
+        reader = csv.reader(file, delimiter=" ")
+        #_ = next(reader)  # uncomment to skip the header row
+        bh_data = np.array(list(reader)).astype(np.float64)
+        bh_time = bh_data[:, 0]
+        bh1_x = -bh_data[:, 5] # x is flipped because the data is in a different coordinate system
+        bh1_y = bh_data[:, 7] # z axis in the data is interpreted as y axis in the visualization
+        bh1_z = np.zeros(len(bh1_x))
+    bh1_x, bh1_y, bh1_z = interpolate_coords_by_time(bh_time, bh1_x, bh1_y, bh1_z, time_array)
+
+    bh_mass_ratio = bh1_mass / bh2_mass
+    bh2_x = -bh1_x * bh_mass_ratio
+    bh2_y = -bh1_y * bh_mass_ratio
+    bh2_z = -bh1_z * bh_mass_ratio
+
     # Create Mayavi objects
+    #mlab.options.offscreen = True
     engine = Engine()
     engine.start()
-    engine.new_scene()
-    engine.scenes[0].scene.jpeg_quality = 100
-    # mlab.options.offscreen = True
+    #engine.new_scene()
+    #engine.scenes[0].scene.jpeg_quality = 100
+    mlab.figure(engine=engine, size=resolution)
+    strain_array, grid, points = initialize_tvtk_grid(num_azi_points, num_radius_points)
+
     create_gw(engine, grid, gw_color)
+    if wireframe:
+        create_gw(engine, grid, gw_color, wireframe=True)
     bh1 = create_sphere(engine, bh1_mass * bh_scaling_factor, bh_color)
     bh2 = create_sphere(engine, bh2_mass * bh_scaling_factor, bh_color)
     mlab.view(
@@ -304,44 +428,51 @@ def main():
     )  # Initialize viewpoint
 
     start_time = time.time()
-    percentage = np.round(np.linspace(0, n_times / save_rate, 101)).astype(int)
+    percentage = list(np.round(np.linspace(0, n_times, 100)).astype(int))
 
-    @mlab.animate()  # ui=False) This doesn't work for some reason?
+    @mlab.animate() # ui=False) This doesn't work for some reason?
     def anim():
-        for time_idx, t, row in zip(range(n_times), time_array, bh_data):
+        for time_idx, t in enumerate(time_array):
             if time_idx % save_rate != 0:
-                continue
+                continue # Skip all but every nth iteration
 
             # Print status messages
-            if time_idx == 10:
+            if time_idx == 10 * save_rate:
                 end_time = time.time()
-                eta = (end_time - start_time) * n_times / 10
+                eta = (end_time - start_time) * n_frames / 10
                 print(
-                    f"""Creating {n_times} meshes and saving them to: {movie_file_path}\nEstimated time: {dhms_time(eta)} minutes"""
+                    f"""Creating {n_frames} frames and saving them to:
+{movie_file_path}\nEstimated time: {dhms_time(eta)}"""
                 )
-
-            if status_messages and time_idx != 0 and np.isin(time_idx, percentage):
-                print(f" {int(time_idx * 100 / (n_times - 1))}% done", end="\r")
+            if status_messages and state != 0 and state > percentage[0]:
+                eta = ((time.time() - start_time) / state) * (num_time_states - state)
+                print(
+                    f"{int(state  * 100 / num_time_states)}% done, ", 
+                    f"{dhms_time(eta)} remaining",
+                    end="\r",
+                )
+                percentage.pop(0)
 
             # Change the position of the black holes
-            _ = float(row[0])  # time
-            bh1_xyz = (float(row[1]), float(row[2]), float(row[3]))
-            bh2_xyz = (float(row[4]), float(row[5]), float(row[6]))
+            bh1_xyz = (bh1_x[n_times], bh1_y[n_times], bh1_z[n_times])
+            bh2_xyz = (bh2_x[n_times], bh2_y[n_times], bh2_z[n_times])
             change_object_position(bh1, bh1_xyz)
             change_object_position(bh2, bh2_xyz)
 
             points.reset()
             index = 0
             for j, radius in enumerate(radius_values):
-                for i, azi in enumerate(azimuth_values):
+                    width = 0.5 * omitted_radius_length
+                    dropoff_radius = width + omitted_radius_length
+                    dropoff_factor = 0.5 + 0.5 * erf((radius - dropoff_radius) / width)
+                for i, _ in enumerate(azimuth_values):
                     x = x_values[j, i]
                     y = y_values[j, i]
-                    # Introduce a discontinuity to make room for the Black Holes
                     if radius <= omitted_radius_length:
                         strain_value = np.nan
                     else:
-                        strain_value = strain_to_mesh[i][time_idx][j].real
-                    z = strain_value * amplitude_scale_factor
+                        strain_value = strain_to_mesh[i][time_idx][j]
+                    z = strain_value * amplitude_scale_factor * dropoff_factor
                     points.insert_next_point(x, y, z)
                     strain_array.set_tuple1(index, strain_value)
                     index += 1
@@ -349,40 +480,60 @@ def main():
             grid._set_points(points)
             grid._get_point_data().add_array(strain_array)
             grid.modified()
-
             mlab.view(
-                azimuth=min(60 + time_idx * 0.018, 78),
-                elevation=max(50 - time_idx * 0.016, 34),
-                distance=min(80 + time_idx * 0.35, 430),
+                #azimuth=min(60 + time_idx * 0.018, 78),
+                elevation = max(50 - time_idx * 0.016, 34),
+                distance = 80 if time_idx < 2000 else min(80 + (time_idx - 2000) * 0.175, 370),
+                focalpoint =(0, 0, 0),
             )
 
             # Save the frame
+            frame_num = int(state/save_rate)
             frame_path = os.path.join(
-                movie_file_path, f"{movie_file_name}{time_idx:05d}.png"
+                movie_file_path, f"z_frame_{frame_num:05d}.png"
             )
-            mlab.savefig(frame_path)
+            mlab.savefig(frame_path, magnification=1)
 
-            if time_idx == n_times - 1:
+            if state >= (n_frames * save_rate) - 1: # Smoothly exit the program
                 total_time = time.time() - start_time
-                print("100% Done")
+                print(f"Done", end="\r")
                 print(
-                    f"\nSaved {n_times} frames to {movie_file_path} in {dhms_time(total_time)}."
+                    f"\nSaved {n_frames} frames to {movie_file_path} ",
+                    f"in {dhms_time(total_time)}."
                 )
-                exit(0)
+                print(f"Creating movie...")
+                convert_to_movie(movie_file_path, movie_file_name, frames_per_second)
+                print(f"Movie saved to {movie_file_path}/{movie_file_name}.mp4")
+                exit()
             yield
-
-    anim()
+            
+    _ = anim()
     mlab.show()
 
+# This should automatically create the movie file, but if it doesn't work, run this in the movie directory:
+# $ffmpeg -framerate 24 -i frame_%05d.png <movie_name>.mp4
 
 if __name__ == "__main__":
+    # run doctests first
     import doctest
 
     results = doctest.testmod()
+    p4s_results = doctest.testmod(psi4strain)
+
+    if p4s_results.failed > 0:
+        print(
+            f"""Doctest in {psi4strain} failed:
+{p4s_results.failed} of {p4s_results.attempted} test(s) passed"""
+        )
+        sys.exit(1)
+    else:
+        print(f"""Doctest in {psi4strain} passed:
+All {p4s_results.attempted} test(s) passed""")
+        
     if results.failed > 0:
         print(f"Doctest failed: {results.failed} of {results.attempted} test(s)")
         exit(1)
     else:
         print(f"Doctest passed: All {results.attempted} test(s) passed")
-
+    # run main() after tests
     main()

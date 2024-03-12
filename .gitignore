@@ -1,7 +1,7 @@
 .vscode
 new
-scripts/__pycache__
 r100
-visit/r100/*
-visit/output/*
-visit/dataout/*
+scripts/__pycache__
+visit/r100
+visit/output
+visit/dataout
