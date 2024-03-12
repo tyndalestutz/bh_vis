@@ -5,13 +5,11 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import curve_fit
 
-OUTPUT_DIR = "visit/dataout"
-VTKOUT = "visit/output"
+OUTPUT_DIR = "psi4Strain"
 INPUT_DIR = "r100"
 FILE_PATTERN = "_l[MODE=L]-"
 ELL_MIN = 2
 ELL_MAX = 8
-S_MODE = -2
 EXT_RAD = 100
 INTERVAL = 200
 CUTTOFF_FACTOR = 0.75
@@ -28,7 +26,7 @@ def read_psi4_dir() -> tuple[np.ndarray, np.ndarray]:
 
     time_data: list[np.ndarray] = []
     psi4_modes_data: list[np.ndarray] = []
-    ntimes = -1
+    n_times = -1
 
     for ell in range(ELL_MIN, ELL_MAX + 1):
         filepath = find_file_for_l(ell)
@@ -56,9 +54,9 @@ def read_psi4_dir() -> tuple[np.ndarray, np.ndarray]:
     return np.array(time_data), np.array(psi4_modes_data)
 
 
-def psi4_fft_to_strain():
+def psi4_ffi_to_strain():
     """
-    Calculates the strain modes from PSI4 data using FFT.
+    Calculates the strain modes from PSI4 data using FFI.
 
     Returns:
         A numpy array of numpy arrays representing the strain modes.
@@ -407,4 +405,4 @@ if __name__ == "__main__":
     else:
         print(f"Doctest passed: All {results.attempted} test(s) passed")
 
-    psi4_fft_to_strain()
+    psi4_ffi_to_strain()

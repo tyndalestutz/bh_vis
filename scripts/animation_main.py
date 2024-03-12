@@ -1,7 +1,6 @@
 import os
 import csv
 import time
-from typing import Tuple, Dict, Any
 import vtk  # Unused, but Required by TVTK.
 from tvtk.api import tvtk
 import numpy as np
@@ -13,9 +12,9 @@ from mayavi.api import Engine
 from mayavi.sources.vtk_data_source import VTKDataSource
 from mayavi.sources.parametric_surface import ParametricSurface
 from mayavi.modules.surface import Surface
+import psi4_FFI_to_strain
 
-# import thescript
-
+BH_DIR = ""
 ELL_MAX = 8
 ELL_MIN = 2
 S_MODE = -2
@@ -73,12 +72,12 @@ def initialize_tvtk_grid(num_azi, num_radius):
 
     :param num_azi: number of azimuthal points on the mesh
     :param num_radius: number of radial points on the mesh
-    :returns: tvtk.api.DataArray(),
+    :returns: tvtk.FloatArray(),
               tvtkUnstructuredGrid(),
               tvtkPoints()
 
     >>> strain_array, grid, points = initialize_tvtk_grid(3, 4)
-    >>> isinstance(strain_array, tvtk.api.DataArray)
+    >>> isinstance(strain_array, tvtk.FloatArray)
     True
     >>> isinstance(grid, tvtk.UnstructuredGrid)
     True
@@ -237,13 +236,10 @@ def main():
 
     # File names
     bh_file_name = "bh_synthetic.csv"
-    bh_file_path = os.path.abspath(
-        os.path.join(__file__, "..", "..", "..", bh_file_name)
-    )
+    bh_file_path = os.path.join(BH_DIR, bh_file_name)
     movie_file_name = "test"
-    movie_file_path = os.path.abspath(
-        os.path.join(__file__, "..", "..", "..", "movies", movie_file_name)
-    )
+    movie_file_path = os.path.join(BH_DIR, "movies", movie_file_name)
+
     if not os.path.exists(movie_file_path):  # Create the directory if it doesn't exist
         os.makedirs(movie_file_path)
 
@@ -266,7 +262,7 @@ def main():
     bh_scaling_factor = 1
 
     # Import strain data
-    time_array, mode_data = psi4_fft_to_strain()
+    time_array, mode_data = psi4_FFI_to_strain.psi4_ffi_to_strain()
     n_times = len(time_array)
 
     # Import black hole data
