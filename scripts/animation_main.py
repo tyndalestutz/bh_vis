@@ -324,7 +324,7 @@ def main() -> None:
 
     if os.path.exists(movie_file_path):
         r = input(
-            f"""{movie_file_path} already exists. Would you like to overwrite it? Y or N: """
+            f"""{movie_file_path} already exists. Would you like to overwrite it? Y/N: """
         )
         if r.lower() != "y":
             print("Please choose a different directory.")
@@ -355,12 +355,18 @@ def main() -> None:
     bh2_mass = 1.24
     bh_scaling_factor = 1
 
+    # ---Preliminary Calculations---
+
+    strain_array, grid, points = initialize_tvtk_grid(n_azi_pts, n_rad_pts)
+    width = 0.5 * omitted_radius_length
+    dropoff_radius = width + omitted_radius_length
+
     # Import strain data
     time_array, mode_data = psi4strain.psi4_ffi_to_strain()
     n_times = len(time_array)
     n_frames = int(n_times / save_rate)
 
-    # Pre-compute theta and radius values for the mesh
+    # theta and radius values for the mesh
     radius_values = np.linspace(0, display_radius, n_rad_pts)
     azimuth_values = np.linspace(0, 2 * np.pi, n_azi_pts, endpoint=False)
 
@@ -369,20 +375,19 @@ def main() -> None:
     y_values = rv * np.sin(az)
 
     # Apply spin-weighted spherical harmonics, superimpose modes, and interpolate to mesh points
-    strain_to_mesh = np.zeros((n_rad_pts, n_azi_pts, n_times))
-
     strain_azi = swsh_summation_angles(colat, azimuth_values, mode_data).real
-
     lerp_times = generate_interpolation_points(time_array, radius_values)
+
+    strain_to_mesh = np.zeros((n_rad_pts, n_azi_pts, n_times))
     for i in range(n_azi_pts):
+        # strain_azi, a function of time_array, is evaluated at t = lerp_times.
         strain_to_mesh[:, i, :] = np.interp(lerp_times, time_array, strain_azi[i, :])
 
-    strain_array, grid, points = initialize_tvtk_grid(n_azi_pts, n_rad_pts)
 
     # Import black hole data
     if bh1_mass > bh2_mass:  # then swap
         bh1_mass, bh2_mass = bh2_mass, bh1_mass
-    
+
     print(
         """**********************************************************************
 Constructing mesh points in 3D..."""
@@ -452,24 +457,22 @@ Constructing mesh points in 3D..."""
                 percentage.pop(0)
 
             # Change the position of the black holes
-            bh1_xyz = (bh1_x[n_times], bh1_y[n_times], bh1_z[n_times])
-            bh2_xyz = (bh2_x[n_times], bh2_y[n_times], bh2_z[n_times])
+            bh1_xyz = (bh1_x[time_idx], bh1_y[time_idx], bh1_z[time_idx])
+            bh2_xyz = (bh2_x[time_idx], bh2_y[time_idx], bh2_z[time_idx])
             change_object_position(bh1, bh1_xyz)
             change_object_position(bh2, bh2_xyz)
 
             points.reset()
             index = 0
-            for j, radius in enumerate(radius_values):
-                width = 0.5 * omitted_radius_length
-                dropoff_radius = width + omitted_radius_length
+            for rad_idx, radius in enumerate(radius_values):
                 dropoff_factor = 0.5 + 0.5 * erf((radius - dropoff_radius) / width)
-                for i, _ in enumerate(azimuth_values):
-                    x = x_values[j, i]
-                    y = y_values[j, i]
+                for azi_idx, _ in enumerate(azimuth_values):
+                    x = x_values[rad_idx, azi_idx]
+                    y = y_values[rad_idx, azi_idx]
                     if radius <= omitted_radius_length:
                         strain_value = np.nan
                     else:
-                        strain_value = strain_to_mesh[i][time_idx][j]
+                        strain_value = strain_to_mesh[rad_idx][azi_idx][time_idx]
                     z = strain_value * amplitude_scale_factor * dropoff_factor
                     points.insert_next_point(x, y, z)
                     strain_array.set_tuple1(index, strain_value)

@@ -13,6 +13,8 @@ ELL_MAX = 8
 EXT_RAD = 100
 INTERVAL = 200
 CUTTOFF_FACTOR = 0.75
+STATUS_MESSAGES = False
+WRITE_FILES = False
 
 
 def read_psi4_dir() -> tuple[np.ndarray, np.ndarray]:
@@ -133,9 +135,7 @@ def psi4_ffi_to_strain():
                 col += 1
 
             arrays_to_txt(labels, strain_cols, strain_filename, OUTPUT_DIR)
-            print(f"Strain l={ell} data saved to {strain_filename}")
             arrays_to_txt(labels, ddot_cols, ddot_filename, OUTPUT_DIR)
-            print(f"Psi4 l={ell} data (processed) saved to {ddot_filename}")
 
     return time_arr, strain_modes
 
@@ -207,17 +207,18 @@ def arrays_to_txt(
     Raises:
         IOError: If there is an error creating the directory or writing to the file.
     """
+    if WRITE_FILES:
+        try:
+            os.makedirs(dir_path, exist_ok=True)
+            file_path = os.path.join(dir_path, filename)
 
-    try:
-        os.makedirs(dir_path, exist_ok=True)
-        file_path = os.path.join(dir_path, filename)
-
-        with open(file_path, mode="w", encoding="utf-8") as file:
-            file.write("".join([f"{label}\n" for label in labels]))
-            for row in zip(*collection):
-                file.write(" ".join([f"{item:.15f}" for item in row]) + "\n")
-    except IOError as e:
-        raise IOError(f"Error saving data to file: {e}") from e
+            with open(file_path, mode="w", encoding="utf-8") as file:
+                file.write("".join([f"{label}\n" for label in labels]))
+                for row in zip(*collection):
+                    file.write(" ".join([f"{item:.15f}" for item in row]) + "\n")
+            print(f"File {filename} saved to {dir_path}")
+        except IOError as e:
+            raise IOError(f"Error saving data to file: {e}") from e
 
 
 def first_time_derivative(
@@ -360,10 +361,11 @@ def quad_fit_intercept(time: NDArray[np.float64], data: NDArray[np.float64]) -> 
     a, b, c = params
     extremum_x = -b / (2 * a)
     quad_fit_extremum = float(quadratic(extremum_x, a, b, c))
-    print(
-        f"Quadratic Vertex at (time = {extremum_x:.7e}, value = {quad_fit_extremum:.7e}).\n"
-        f"Params: a = {a:.7e}, b = {b:.7e}, c = {c:.7e}, Intercept magnitude: {np.fabs(c):.7e}"
-    )
+    if STATUS_MESSAGES:
+        print(
+            f"Quadratic Vertex at (time = {extremum_x:.7e}, value = {quad_fit_extremum:.7e}).\n"
+            f"Params: a = {a:.7e}, b = {b:.7e}, c = {c:.7e}, Intercept magnitude: {np.fabs(c):.7e}"
+        )
     return np.fabs(c)
 
 
@@ -390,7 +392,6 @@ def extract_min_omega_ell2_em2(
         ]
         filename = f"Rpsi4_r{EXT_RAD:06.1f}_ell2_m2_phase_amp_omega.txt"
         arrays_to_txt(labels, collection, filename, OUTPUT_DIR)
-        print(f"Time, Amplitude, Phase, and Omega from l=m=2 data saved to {filename}")
     return quad_fit_intercept(time, angular_frequency)
 
 
@@ -403,6 +404,7 @@ if __name__ == "__main__":
         print(f"Doctest failed: {results.failed} of {results.attempted} test(s)")
         sys.exit(1)
     else:
-        print(f"Doctest passed: All {results.attempted} test(s) passed")
+        if STATUS_MESSAGES:
+            print(f"Doctest passed: All {results.attempted} test(s) passed")
 
     psi4_ffi_to_strain()
