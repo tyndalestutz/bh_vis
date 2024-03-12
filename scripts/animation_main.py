@@ -8,15 +8,15 @@ moved to their respective positions and the render is saved as a .png file.
 import os
 import sys
 import csv
-import cv2
 import time
 from math import erf
-from typing import Tuple, Dict, Any
+from typing import Tuple, Any
 import numpy as np
 from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 import quaternionic
 import spherical
+import cv2
 import vtk  # Unused, but Required by TVTK.
 from tvtk.api import tvtk
 from mayavi import mlab
@@ -27,11 +27,12 @@ from mayavi.modules.surface import Surface
 import psi4_FFI_to_strain as psi4strain
 
 
-BH_DIR = ""
-MOVIE_DIR = ""
+BH_DIR = "../BH_VIS/r100"
+MOVIE_DIR = "movies"
 ELL_MAX = 8
 ELL_MIN = 2
 S_MODE = -2
+EXT_RAD = 100
 
 
 def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
@@ -55,7 +56,9 @@ def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
 
 
 def generate_interpolation_points(  # Could use some revisiting, currently keeps n_times constant
-    time_array: NDArray[np.float64], radius_values: NDArray[np.float64], r_ext: int
+    time_array: NDArray[np.float64],
+    radius_values: NDArray[np.float64],
+    r_ext: int = EXT_RAD,
 ) -> NDArray[np.float64]:
     """
     Fills out a 2D array of adjusted time values for the wave strain to be
@@ -79,24 +82,25 @@ def generate_interpolation_points(  # Could use some revisiting, currently keeps
 
 
 def interpolate_coords_by_time(
-    og_time_array: NDArray[np.float64], 
-    e1: NDArray[np.float64], 
+    old_times: NDArray[np.float64],
+    e1: NDArray[np.float64],
     e2: NDArray[np.float64],
     e3: NDArray[np.float64],
-    new_time_array: float) -> Tuple:
+    new_times: float,
+) -> Tuple:
     """
     Interpolates the 3D coordinates to the given time state.
-    :param og_time_array: original time array
+    :param old_times: original time array
     :param e1: first coordinate array
     :param e2: second coordinate array
     :param e3: third coordinate array
-    :param new_time_array: new time array
+    :param new_times: new time array
     :return: interpolated 3D coordinates
     """
 
-    new_e1 = interp1d(og_time_array, e1, kind="linear", fill_value="extrapolate")(new_time_array)
-    new_e2 = interp1d(og_time_array, e2, kind="linear", fill_value="extrapolate")(new_time_array)
-    new_e3 = interp1d(og_time_array, e3, kind="linear", fill_value="extrapolate")(new_time_array)
+    new_e1 = interp1d(old_times, e1, fill_value="extrapolate")(new_times)
+    new_e2 = interp1d(old_times, e2, fill_value="extrapolate")(new_times)
+    new_e3 = interp1d(old_times, e3, fill_value="extrapolate")(new_times)
     return new_e1, new_e2, new_e3
 
 
@@ -151,7 +155,7 @@ def create_gw(
     engine: Engine,
     grid: Any,
     color: Tuple[float, float, float],
-    wireframe: bool = False
+    wireframe: bool = False,
 ) -> None:
     """
     Creates and displays a gravitational wave strain from a given grid.
@@ -284,12 +288,12 @@ def convert_to_movie(input_path: str, movie_name: str, fps: int = 24) -> None:
     frames.sort()
     # Create a movie from the frames
     ref = cv2.imread(os.path.join(input_path, frames[0]))
-    height, width, layers = ref.shape
+    height, width, _ = ref.shape
     video = cv2.VideoWriter(
         os.path.join(input_path, f"{movie_name}.mp4"),
         cv2.VideoWriter_fourcc(*"mp4v"),
         fps,
-        (width, height)
+        (width, height),
     )
     for frame in frames:
         f = cv2.imread(os.path.join(input_path, frame))
@@ -308,29 +312,19 @@ def main() -> None:
     are moved to their respective positions and the mesh is saved as a .png file.
     """
 
-    if len(sys.argv) != 3:
-        file_name = os.path.basename(__file__)
-        raise RuntimeError(
-            f"""Please include path to psi4 folder data as well as the extraction radius of that data.
-            Usage: python3 {file_name} <path to psi4 folder> <extraction radius (r/M) (4 digits, e.g. 0100)>"""
-        )
-    psi4_folder_path = str(sys.argv[1])
-    radius_of_extraction = int(sys.argv[2])
-    #print(f"EXTRACTION RADIUS: {float(radius_of_extraction)}")
     # Convert psi4 data to strain using imported script
-    #psi4_to_strain.main()
-    
+    # psi4_to_strain.main()
+
     # File names
-    gw_file_name = "Rpsi4_r0100.0_l[ELLVAL]_conv_to_strain.txt"
-    gw_file_path = os.path.join(psi4_folder_path, gw_file_name)
-    
     bh_file_name = "puncture_posns_vels_regridxyzU.txt"
     bh_file_path = os.path.join(BH_DIR, bh_file_name)
     movie_file_name = "first_real_movie"
     movie_file_path = os.path.join(MOVIE_DIR, movie_file_name)
-    
-    if os.path.exists(movie_file_path):  # Check if the directory exists 
-        r = input(f"""{movie_file_path} already exists. Would you like to overwrite it? Y or N: """)
+
+    if os.path.exists(movie_file_path):
+        r = input(
+            f"""{movie_file_path} already exists. Would you like to overwrite it? Y or N: """
+        )
         if r.lower() != "y":
             print("Please choose a different directory.")
             exit()
@@ -338,12 +332,11 @@ def main() -> None:
             os.remove(os.path.join(movie_file_path, file))
     else:
         os.makedirs(movie_file_path)
-    
+
     # Mathematical parameters
-    num_radius_points = 450
-    num_azi_points = 180
+    n_rad_pts = 450
+    n_azi_pts = 180
     display_radius = 300
-    radius_of_extraction = 100
     amplitude_scale_factor = 200
     omitted_radius_length = 10
 
@@ -358,15 +351,13 @@ def main() -> None:
     gw_color = (0.28, 0.46, 1.0)
     bh_color = (0.1, 0.1, 0.1)
     bh1_mass = 1
-    bh2_mass = 1.24 
+    bh2_mass = 1.24
     bh_scaling_factor = 1
 
     # Import strain data
     time_array, mode_data = psi4strain.psi4_ffi_to_strain()
     n_times = len(time_array)
-    
     n_frames = int(n_times / save_rate)
-
 
     # Pre-compute theta and radius values for the mesh
     radius_values = np.linspace(0, display_radius, n_rad_pts)
@@ -376,33 +367,37 @@ def main() -> None:
     x_values = rv * np.cos(az)
     y_values = rv * np.sin(az)
 
-    print("""**********************************************************************
-Constructing mesh points in 3D...""")
-    # Holds the final strain points indexed [azimuthal point (key)][time state][radius]
-    strain_to_mesh = {}
+    print(
+        """**********************************************************************
+Constructing mesh points in 3D..."""
+    )
     # Apply spin-weighted spherical harmonics, superimpose modes, and interpolate to mesh points
     strain_to_mesh = np.zeros((n_rad_pts, n_azi_pts, n_times))
-    
+
     strain_azi = swsh_summation_angles(colat, azimuth_values, mode_data).real
 
-    lerp_times = generate_interpolation_points(time_array, radius_values, ext_rad)
     for i in range(n_azi_pts):
         strain_to_mesh[:, i, :] = np.interp(lerp_times, time_array, strain_azi[i, :])
 
     strain_array, grid, points = initialize_tvtk_grid(n_azi_pts, n_rad_pts)
 
     # Import black hole data
-    if bh1_mass > bh2_mass:
-        (bh1_mass, bh2_mass) = (bh2_mass, bh1_mass) # Swap the masses so that the heavier black hole is bh2
+    if bh1_mass > bh2_mass:  # then swap
+        bh1_mass, bh2_mass = bh2_mass, bh1_mass
+
     with open(bh_file_path, mode="r", encoding="utf-8") as file:
         reader = csv.reader(file, delimiter=" ")
-        #_ = next(reader)  # uncomment to skip the header row
-        bh_data = np.array(list(reader)).astype(np.float64)
-        bh_time = bh_data[:, 0]
-        bh1_x = -bh_data[:, 5] # x is flipped because the data is in a different coordinate system
-        bh1_y = bh_data[:, 7] # z axis in the data is interpreted as y axis in the visualization
-        bh1_z = np.zeros(len(bh1_x))
-    bh1_x, bh1_y, bh1_z = interpolate_coords_by_time(bh_time, bh1_x, bh1_y, bh1_z, time_array)
+    # _ = next(reader)  # uncomment to skip the header row
+    bh_data = np.array(list(reader)).astype(np.float64)
+    bh_time = bh_data[:, 0]
+    # x is flipped because the data is in a different coordinate system
+    bh1_x = -bh_data[:, 5]
+    # z axis in the data is interpreted as y axis in the visualization
+    bh1_y = bh_data[:, 7]
+    bh1_z = np.zeros(len(bh1_x))
+    bh1_x, bh1_y, bh1_z = interpolate_coords_by_time(
+        bh_time, bh1_x, bh1_y, bh1_z, time_array
+    )
 
     bh_mass_ratio = bh1_mass / bh2_mass
     bh2_x = -bh1_x * bh_mass_ratio
@@ -410,13 +405,13 @@ Constructing mesh points in 3D...""")
     bh2_z = -bh1_z * bh_mass_ratio
 
     # Create Mayavi objects
-    #mlab.options.offscreen = True
+    # mlab.options.offscreen = True
     engine = Engine()
     engine.start()
-    #engine.new_scene()
-    #engine.scenes[0].scene.jpeg_quality = 100
+    # engine.new_scene()
+    # engine.scenes[0].scene.jpeg_quality = 100
     mlab.figure(engine=engine, size=resolution)
-    strain_array, grid, points = initialize_tvtk_grid(num_azi_points, num_radius_points)
+    strain_array, grid, points = initialize_tvtk_grid(n_azi_pts, n_rad_pts)
 
     create_gw(engine, grid, gw_color)
     if wireframe:
@@ -430,11 +425,11 @@ Constructing mesh points in 3D...""")
     start_time = time.time()
     percentage = list(np.round(np.linspace(0, n_times, 100)).astype(int))
 
-    @mlab.animate() # ui=False) This doesn't work for some reason?
+    @mlab.animate()  # ui=False) This doesn't work for some reason?
     def anim():
-        for time_idx, t in enumerate(time_array):
+        for time_idx in range(n_times):
             if time_idx % save_rate != 0:
-                continue # Skip all but every nth iteration
+                continue  # Skip all but every nth iteration
 
             # Print status messages
             if time_idx == 10 * save_rate:
@@ -444,10 +439,10 @@ Constructing mesh points in 3D...""")
                     f"""Creating {n_frames} frames and saving them to:
 {movie_file_path}\nEstimated time: {dhms_time(eta)}"""
                 )
-            if status_messages and state != 0 and state > percentage[0]:
-                eta = ((time.time() - start_time) / state) * (num_time_states - state)
+            if status_messages and time_idx != 0 and time_idx > percentage[0]:
+                eta = ((time.time() - start_time) / time_idx) * (n_times - time_idx)
                 print(
-                    f"{int(state  * 100 / num_time_states)}% done, ", 
+                    f"{int(time_idx  * 100 / n_times)}% done, ",
                     f"{dhms_time(eta)} remaining",
                     end="\r",
                 )
@@ -462,9 +457,9 @@ Constructing mesh points in 3D...""")
             points.reset()
             index = 0
             for j, radius in enumerate(radius_values):
-                    width = 0.5 * omitted_radius_length
-                    dropoff_radius = width + omitted_radius_length
-                    dropoff_factor = 0.5 + 0.5 * erf((radius - dropoff_radius) / width)
+                width = 0.5 * omitted_radius_length
+                dropoff_radius = width + omitted_radius_length
+                dropoff_factor = 0.5 + 0.5 * erf((radius - dropoff_radius) / width)
                 for i, _ in enumerate(azimuth_values):
                     x = x_values[j, i]
                     y = y_values[j, i]
@@ -481,36 +476,38 @@ Constructing mesh points in 3D...""")
             grid._get_point_data().add_array(strain_array)
             grid.modified()
             mlab.view(
-                #azimuth=min(60 + time_idx * 0.018, 78),
-                elevation = max(50 - time_idx * 0.016, 34),
-                distance = 80 if time_idx < 2000 else min(80 + (time_idx - 2000) * 0.175, 370),
-                focalpoint =(0, 0, 0),
+                # azimuth=min(60 + time_idx * 0.018, 78),
+                elevation=max(50 - time_idx * 0.016, 34),
+                distance=(
+                    80 if time_idx < 2000 else min(80 + (time_idx - 2000) * 0.175, 370)
+                ),
+                focalpoint=(0, 0, 0),
             )
 
             # Save the frame
-            frame_num = int(state/save_rate)
-            frame_path = os.path.join(
-                movie_file_path, f"z_frame_{frame_num:05d}.png"
-            )
+            frame_num = int(time_idx / save_rate)
+            frame_path = os.path.join(movie_file_path, f"z_frame_{frame_num:05d}.png")
             mlab.savefig(frame_path, magnification=1)
 
-            if state >= (n_frames * save_rate) - 1: # Smoothly exit the program
+            if time_idx >= (n_frames * save_rate) - 1:  # Smoothly exit the program
                 total_time = time.time() - start_time
-                print(f"Done", end="\r")
+                print("Done", end="\r")
                 print(
                     f"\nSaved {n_frames} frames to {movie_file_path} ",
-                    f"in {dhms_time(total_time)}."
+                    f"in {dhms_time(total_time)}.",
                 )
-                print(f"Creating movie...")
+                print("Creating movie...")
                 convert_to_movie(movie_file_path, movie_file_name, frames_per_second)
                 print(f"Movie saved to {movie_file_path}/{movie_file_name}.mp4")
                 exit()
             yield
-            
+
     _ = anim()
     mlab.show()
 
-# This should automatically create the movie file, but if it doesn't work, run this in the movie directory:
+
+# This should automatically create the movie file...
+# if it doesn't work, run the following in the movie directory:
 # $ffmpeg -framerate 24 -i frame_%05d.png <movie_name>.mp4
 
 if __name__ == "__main__":
@@ -527,9 +524,11 @@ if __name__ == "__main__":
         )
         sys.exit(1)
     else:
-        print(f"""Doctest in {psi4strain} passed:
-All {p4s_results.attempted} test(s) passed""")
-        
+        print(
+            f"""Doctest in {psi4strain} passed:
+All {p4s_results.attempted} test(s) passed"""
+        )
+
     if results.failed > 0:
         print(f"Doctest failed: {results.failed} of {results.attempted} test(s)")
         exit(1)
