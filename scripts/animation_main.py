@@ -368,10 +368,6 @@ def main() -> None:
     x_values = rv * np.cos(az)
     y_values = rv * np.sin(az)
 
-    print(
-        """**********************************************************************
-Constructing mesh points in 3D..."""
-    )
     # Apply spin-weighted spherical harmonics, superimpose modes, and interpolate to mesh points
     strain_to_mesh = np.zeros((n_rad_pts, n_azi_pts, n_times))
 
@@ -386,11 +382,16 @@ Constructing mesh points in 3D..."""
     # Import black hole data
     if bh1_mass > bh2_mass:  # then swap
         bh1_mass, bh2_mass = bh2_mass, bh1_mass
+    
+    print(
+        """**********************************************************************
+Constructing mesh points in 3D..."""
+    )
 
     with open(bh_file_path, mode="r", encoding="utf-8") as file:
         reader = csv.reader(file, delimiter=" ")
-    # _ = next(reader)  # uncomment to skip the header row
-    bh_data = np.array(list(reader)).astype(np.float64)
+        # _ = next(reader)  # uncomment to skip the header row
+        bh_data = np.array(list(reader)).astype(np.float64)
     bh_time = bh_data[:, 0]
     # x is flipped because the data is in a different coordinate system
     bh1_x = -bh_data[:, 5]
