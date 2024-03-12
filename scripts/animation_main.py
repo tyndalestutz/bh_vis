@@ -318,6 +318,7 @@ def main() -> None:
     # File names
     bh_file_name = "puncture_posns_vels_regridxyzU.txt"
     bh_file_path = os.path.join(BH_DIR, bh_file_name)
+
     movie_file_name = "first_real_movie"
     movie_file_path = os.path.join(MOVIE_DIR, movie_file_name)
 
@@ -376,6 +377,7 @@ Constructing mesh points in 3D..."""
 
     strain_azi = swsh_summation_angles(colat, azimuth_values, mode_data).real
 
+    lerp_times = generate_interpolation_points(time_array, radius_values)
     for i in range(n_azi_pts):
         strain_to_mesh[:, i, :] = np.interp(lerp_times, time_array, strain_azi[i, :])
 
