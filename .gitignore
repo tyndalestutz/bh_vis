@@ -1,7 +1,3 @@
 .vscode
-new/*
-scripts/gen-gw-main copy.py
-r100/*
-visit/r100/*
-scripts/util-psi4-wip.py
-visit/output/*
+r100
+scripts/__pycache__
