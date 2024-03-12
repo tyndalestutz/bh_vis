@@ -1,8 +1,6 @@
 import sys
 import os
-import time as mod_time
-from typing import Dict, List, Tuple, Any
-import matplotlib.pyplot as plt
+from typing import List, Tuple
 import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import curve_fit
@@ -17,7 +15,6 @@ S_MODE = -2
 EXT_RAD = 100
 INTERVAL = 200
 CUTTOFF_FACTOR = 0.75
-STATUS_MESSAGES = True
 
 
 def read_psi4_dir() -> tuple[np.ndarray, np.ndarray]:
@@ -31,7 +28,7 @@ def read_psi4_dir() -> tuple[np.ndarray, np.ndarray]:
 
     time_data: list[np.ndarray] = []
     psi4_modes_data: list[np.ndarray] = []
-    consistant_length = -1
+    ntimes = -1
 
     for ell in range(ELL_MIN, ELL_MAX + 1):
         filepath = find_file_for_l(ell)
@@ -44,12 +41,12 @@ def read_psi4_dir() -> tuple[np.ndarray, np.ndarray]:
         )  # sorts by time, removing duplicates
         data = data[index]  # sorts data accordningly
 
-        if consistant_length == -1:
-            consistant_length = len(time_data)
+        if n_times == -1:
+            n_times = len(time_data)
 
-        if consistant_length != len(time_data):
+        if n_times != len(time_data):
             raise ValueError(
-                f"Inconsistent time data for l={ell}. Expected {consistant_length}, got {len(time_data)}."
+                f"Inconsistent times for l={ell}. Expected {n_times}, got {len(time_data)}."
             )
 
         real_idx = 1
@@ -77,7 +74,7 @@ def psi4_fft_to_strain():
         raise IOError(f"Error reading PSI4 data: {e}") from e
 
     # Get minimum frequency cutoff from l=m=2 mode
-    min_omega_l2m2 = extract_min_omega_ell2_m2(
+    min_omega_l2m2 = extract_min_omega_ell2_em2(
         time_arr, psi4_modes_data[get_index_from_modes(2, 2)]
     )
     freq_cutoff = CUTTOFF_FACTOR * min_omega_l2m2
@@ -259,12 +256,12 @@ def second_time_derivative(
     time: NDArray[np.float64], data: NDArray[np.float64]
 ) -> NDArray[np.float64]:
     """
-    Compute the second time derivative of the input data using the second-order finite difference method,
-    with upwind/downwind stencils for the endpoints.
+    Compute the second time derivative of the input data using the second-order
+    finite difference method, with upwind/downwind stencils for the endpoints.
 
     :param time: A numpy array containing time values.
-    :param data: A numpy array containing data for which the second time derivative is to be calculated.
-    :return: A numpy array containing the second time derivative of the input data.
+    :param data: A numpy array containing corresponding function values to take derivatives of.
+    :return: A numpy array containing the second time derivative of the function data.
 
     >>> time = np.array([0, 1, 2, 3, 4], dtype=np.float64)
     >>> data = np.array([0, 1, 4, 9, 16], dtype=np.float64)
@@ -299,7 +296,8 @@ def psi4_phase_and_amplitude(
 
     :param time: A numpy array containing time values.
     :param cmplx: A numpy array containing the a complex signal.
-    :return: A tuple containing four numpy arrays (time, amplitude, cumulative_phase, cumulative_phase_derivative).
+    :return: A tuple containing four numpy arrays:
+        (time, amplitude, cumulative_phase, cumulative_phase_derivative).
     :raises ValueError: If the lengths of time, real, and imag arrays are not equal.
     """
     if len(time) != len(cmplx):
@@ -326,13 +324,13 @@ def psi4_phase_and_amplitude(
 
 def quad_fit_intercept(time: NDArray[np.float64], data: NDArray[np.float64]) -> float:
     """
-    Fits a quadratic curve to the data within a specified time range and outputs the intercept value.
+    Samples data from a time interval, applies a quadratic fit, and outputs the |y-intercept|.
     This function is intended for l=m=2 angular frequency data.
 
     :param interval_start: A float specifying the begining of the sample interval.
     :param time: A numpy array containing time values.
     :param data: A numpy array containing data values corresponding to the time values.
-    :return: The absolute value of the quadratic curve evaluated at t=0.
+    :return: The float absolute value of the quadratic curve evaluated at t=0.
     :raises ValueError: If the lengths of time and data arrays are not equal.
     """
     if len(time) != len(data):
@@ -371,7 +369,7 @@ def quad_fit_intercept(time: NDArray[np.float64], data: NDArray[np.float64]) -> 
     return np.fabs(c)
 
 
-def extract_min_omega_ell2_m2(
+def extract_min_omega_ell2_em2(
     time: NDArray[np.float64], data_m2_l2: NDArray[np.complex128]
 ) -> float:
     """
@@ -380,13 +378,18 @@ def extract_min_omega_ell2_m2(
 
     :param time_arr: Array of time data.
     :param mode_data: Dictionary containing the mode data.
-    :return: A tuple with parameters from the fit quadratic to omega (minimum value, vertex, curvature).
+    :return: float magnitude of the minimum wave frequency of the data
     """
 
     collection = psi4_phase_and_amplitude(time, data_m2_l2)
     angular_frequency = collection[3]
     if OUTPUT_DIR != "":
-        labels = ["# Col 0: Time", "# Col 1: Amplitude", "# Col 2: Cumulative_Phase", "# Col 3: Angular Frequency"]
+        labels = [
+            "# Col 0: Time",
+            "# Col 1: Amplitude",
+            "# Col 2: Cumulative_Phase",
+            "# Col 3: Angular Frequency",
+        ]
         filename = f"Rpsi4_r{EXT_RAD:06.1f}_ell2_m2_phase_amp_omega.txt"
         arrays_to_txt(labels, collection, filename, OUTPUT_DIR)
         print(f"Time, Amplitude, Phase, and Omega from l=m=2 data saved to {filename}")
