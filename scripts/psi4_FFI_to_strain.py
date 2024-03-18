@@ -5,16 +5,17 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import curve_fit
 
-OUTPUT_DIR = "psi4Strain"
-INPUT_DIR = "r100"
+
+INPUT_DIR = "../r100" # changeable in animation_main.py
+OUTPUT_DIR = os.path.join(INPUT_DIR, "converted_strain")
 FILE_PATTERN = "_l[MODE=L]-"
 ELL_MIN = 2
 ELL_MAX = 8
-EXT_RAD = 100
+EXT_RAD = 100 # changeable in animation_main.py
 INTERVAL = 200
 CUTTOFF_FACTOR = 0.75
-STATUS_MESSAGES = False
-WRITE_FILES = False
+STATUS_MESSAGES = True
+WRITE_FILES = False # changeable in animation_main.py
 
 
 def read_psi4_dir() -> tuple[np.ndarray, np.ndarray]:

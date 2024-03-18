@@ -16,7 +16,7 @@ from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 import quaternionic
 import spherical
-import cv2
+import cv2 # pip install opencv-python
 import vtk  # Unused, but Required by TVTK.
 from tvtk.api import tvtk
 from mayavi import mlab
@@ -27,13 +27,14 @@ from mayavi.modules.surface import Surface
 import psi4_FFI_to_strain as psi4strain
 
 
-BH_DIR = "../BH_VIS/r100"
-MOVIE_DIR = "movies"
+BH_DIR = "../r100" # changeable with sys arguments
+MOVIE_DIR = BH_DIR # changeable with sys arguments
 ELL_MAX = 8
 ELL_MIN = 2
 S_MODE = -2
-EXT_RAD = 100
-
+EXT_RAD = 100 # changeable with sys arguments
+USE_SYS_ARGS = True
+STATUS_MESSAGES = True
 
 def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
     """
@@ -300,6 +301,18 @@ def convert_to_movie(input_path: str, movie_name: str, fps: int = 24) -> None:
         video.write(f)
     video.release()
 
+def ask_user(message: str):
+    """
+    Allows user input in the command terminal to a Yes/No response.
+    Returns boolean based on input.
+
+    :param message: message to ask the user (indicate Y/N input).
+    """
+    response = input(message)
+    if response.lower() != "y":
+        return False
+    else:
+        return True
 
 def main() -> None:
     """
@@ -315,6 +328,25 @@ def main() -> None:
     # Convert psi4 data to strain using imported script
     # psi4_to_strain.main()
 
+    # Check initial parameters
+    if USE_SYS_ARGS:
+        if len(sys.argv) != 3:
+            raise RuntimeError(
+                """Please include path to merger data as well as the psi4 extraction radius of that data.
+                Usage: python3 animation_main.py <path to data folder> <extraction radius (r/M) (4 digits, e.g. 0100)>"""
+            )
+        else:
+            # change directories and extraction radius based on inputs
+            BH_DIR = str(sys.argv[1])
+            psi4strain.INPUT_DIR = str(sys.argv[1])
+            psi4strain.OUTPUT_DIR = os.path.join(psi4strain.INPUT_DIR, "converted_strain")
+            EXT_RAD = float(sys.argv[2])
+            psi4strain.EXT_RAD = float(sys.argv[2])
+        if ask_user(
+            f"Save converted strain to {psi4strain.INPUT_DIR} ? (Y/N): "
+        ):
+            psi4strain.WRITE_FILES = True
+
     # File names
     bh_file_name = "puncture_posns_vels_regridxyzU.txt"
     bh_file_path = os.path.join(BH_DIR, bh_file_name)
@@ -323,10 +355,9 @@ def main() -> None:
     movie_file_path = os.path.join(MOVIE_DIR, movie_file_name)
 
     if os.path.exists(movie_file_path):
-        r = input(
+        if ask_user(
             f"""{movie_file_path} already exists. Would you like to overwrite it? Y/N: """
-        )
-        if r.lower() != "y":
+        ) == False:
             print("Please choose a different directory.")
             exit()
         for file in os.listdir(movie_file_path):
@@ -344,7 +375,6 @@ def main() -> None:
     colat = np.pi / 2  # colatitude angle representative of the plane of merger
 
     # Cosmetic parameters
-    status_messages = True
     wireframe = True
     frames_per_second = 24
     save_rate = 10  # Saves every Nth frame
@@ -356,11 +386,21 @@ def main() -> None:
     bh_scaling_factor = 1
 
     # ---Preliminary Calculations---
-
+    if STATUS_MESSAGES:
+        print(
+            """**********************************************************************
+    Initializing grid points..."""
+        )
     strain_array, grid, points = initialize_tvtk_grid(n_azi_pts, n_rad_pts)
     width = 0.5 * omitted_radius_length
     dropoff_radius = width + omitted_radius_length
-
+    
+    if STATUS_MESSAGES:
+        print(
+            """**********************************************************************
+    Converting psi4 data to strain..."""
+        )
+    
     # Import strain data
     time_array, mode_data = psi4strain.psi4_ffi_to_strain()
     n_times = len(time_array)
@@ -374,6 +414,12 @@ def main() -> None:
     x_values = rv * np.cos(az)
     y_values = rv * np.sin(az)
 
+    if STATUS_MESSAGES:
+        print(
+            """**********************************************************************
+    Constructing mesh points in 3D..."""
+        )
+
     # Apply spin-weighted spherical harmonics, superimpose modes, and interpolate to mesh points
     strain_azi = swsh_summation_angles(colat, azimuth_values, mode_data).real
     lerp_times = generate_interpolation_points(time_array, radius_values)
@@ -383,15 +429,15 @@ def main() -> None:
         # strain_azi, a function of time_array, is evaluated at t = lerp_times.
         strain_to_mesh[:, i, :] = np.interp(lerp_times, time_array, strain_azi[i, :])
 
+    if STATUS_MESSAGES:
+        print(
+            """**********************************************************************
+    Calculating black hole trajectories..."""
+        )
 
     # Import black hole data
     if bh1_mass > bh2_mass:  # then swap
         bh1_mass, bh2_mass = bh2_mass, bh1_mass
-
-    print(
-        """**********************************************************************
-Constructing mesh points in 3D..."""
-    )
 
     with open(bh_file_path, mode="r", encoding="utf-8") as file:
         reader = csv.reader(file, delimiter=" ")
@@ -412,14 +458,20 @@ Constructing mesh points in 3D..."""
     bh2_y = -bh1_y * bh_mass_ratio
     bh2_z = -bh1_z * bh_mass_ratio
 
+    if STATUS_MESSAGES:
+        print(
+            """**********************************************************************
+    Initializing animation..."""
+        )
+
     # Create Mayavi objects
-    # mlab.options.offscreen = True
+    #mlab.options.offscreen = True
     engine = Engine()
     engine.start()
     # engine.new_scene()
     # engine.scenes[0].scene.jpeg_quality = 100
     mlab.figure(engine=engine, size=resolution)
-    strain_array, grid, points = initialize_tvtk_grid(n_azi_pts, n_rad_pts)
+    #strain_array, grid, points = initialize_tvtk_grid(n_azi_pts, n_rad_pts)
 
     create_gw(engine, grid, gw_color)
     if wireframe:
@@ -447,7 +499,7 @@ Constructing mesh points in 3D..."""
                     f"""Creating {n_frames} frames and saving them to:
 {movie_file_path}\nEstimated time: {dhms_time(eta)}"""
                 )
-            if status_messages and time_idx != 0 and time_idx > percentage[0]:
+            if STATUS_MESSAGES and time_idx != 0 and time_idx > percentage[0]:
                 eta = ((time.time() - start_time) / time_idx) * (n_times - time_idx)
                 print(
                     f"{int(time_idx  * 100 / n_times)}% done, ",
