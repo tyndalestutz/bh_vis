@@ -7,7 +7,7 @@ The BH@H Visualization Toolkit provides a foundation for visualizing simulation 
 
 </br>
 
-*NOTE: If you're already familiar with and prefer the visualization software [VisIt](https://visit-dav.github.io/visit-website/index.html), older tools originally used to develop this repository can be found in the [depricated VisIt branch]().*
+*NOTE: If you're already familiar with and prefer the visualization software [VisIt](https://visit-dav.github.io/visit-website/index.html), older tools originally used to develop this repository can be found in the [deprecated VisIt branch](https://github.com/tyndalestutz/bh_vis/tree/tyndalestutz/deprecated-visit_tools).*
 
 </br>
 
@@ -18,7 +18,7 @@ The BH@H Visualization Toolkit provides a foundation for visualizing simulation 
 
 Whether you have your own data or you'd like to tinker with our sample data, simply clone this repository into a new folder and navigate to [the comprehensive step-by-step guide](jupyter_notebooks/Tutorial-Start_to_Finish-Psi4_to_mp4.ipynb) to create your first movie!
 
-To use these scripts with your own data, take a look at [this brief explanation](link_to_notebook_that_I'll_make) of compatible data formats, along with instructions to prepare your data. 
+To use these scripts with your own data, take a look at [this brief explanation](jupyter_notebooks/Tutorial-Compatible_Data_Formats.ipynb) of compatible data formats, along with instructions to prepare your data. 
 
 ## Resources
 
