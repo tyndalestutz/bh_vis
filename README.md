@@ -18,7 +18,20 @@ The BH@H Visualization Toolkit provides a foundation for visualizing simulation 
 
 Whether you have your own data or you'd like to tinker with our sample data, simply clone this repository into a new folder and navigate to [the comprehensive step-by-step guide](jupyter_notebooks/Tutorial-Start_to_Finish-Psi4_to_mp4.ipynb) to create your first movie!
 
-To use these scripts with your own data, take a look at [this brief explanation](jupyter_notebooks/Tutorial-Compatible_Data_Formats.ipynb) of compatible data formats, along with instructions to prepare your data. 
+To use these scripts with your own data, take a look at [this brief explanation](jupyter_notebooks/Tutorial-Compatible_Data_Formats.ipynb) of compatible data formats, along with instructions to prepare your data.
+
+### Windows 11 installation
+1. In the directory where you would like the repository, open terminal and run this codeblock. Alternatively run each line individually as needed.
+```py
+git clone https://github.com/tyndalestutz/bh_vis.git
+cd bh_vis
+Python -m venv .venv
+.venv/scripts/Activate.ps1
+pip install -U numpy "vtk<9.4" pillow pytest traitsui PyQt5 
+pip install -U git+https://github.com/enthought/mayavi.git
+
+```
+ (note that you must have a version of python installed and added to PATH):
 
 ## Resources
 
@@ -37,4 +50,3 @@ Pull requests are welcome! If you'd like to add or fix anything, follow these st
 4. Add your features or bug fixes.
 5. `git push origin <my-branch-name>` to push your branch to your forked repository.
 6. Head back to the upstream `tyndalestutz/bh_vis` repository and submit a pull request using your branch from your forked repository.
-
