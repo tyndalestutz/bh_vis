@@ -1,4 +1,5 @@
 .vscode
+.venv
 new
 r100
 scripts/__pycache__
