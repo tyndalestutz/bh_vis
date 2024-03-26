@@ -27,13 +27,13 @@ from mayavi.modules.surface import Surface
 import psi4_FFI_to_strain as psi4strain
 
 
-BH_DIR = "../r100" # changeable with sys arguments
-MOVIE_DIR = BH_DIR # changeable with sys arguments
+BH_DIR = "../BH_VIS/data/puncture" # changeable with sys arguments
+MOVIE_DIR = "../BH_VIS/data/Movies" # changeable with sys arguments
 ELL_MAX = 8
 ELL_MIN = 2
 S_MODE = -2
 EXT_RAD = 100 # changeable with sys arguments
-USE_SYS_ARGS = True
+USE_SYS_ARGS = False
 STATUS_MESSAGES = True
 
 def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
@@ -59,7 +59,7 @@ def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
 def generate_interpolation_points(  # Could use some revisiting, currently keeps n_times constant
     time_array: NDArray[np.float64],
     radius_values: NDArray[np.float64],
-    r_ext: int = EXT_RAD,
+    r_ext: float,
 ) -> NDArray[np.float64]:
     """
     Fills out a 2D array of adjusted time values for the wave strain to be
@@ -329,6 +329,7 @@ def main() -> None:
     # psi4_to_strain.main()
 
     # Check initial parameters
+    time0 = time.time()
     if USE_SYS_ARGS:
         if len(sys.argv) != 3:
             raise RuntimeError(
@@ -337,22 +338,26 @@ def main() -> None:
             )
         else:
             # change directories and extraction radius based on inputs
-            BH_DIR = str(sys.argv[1])
-            psi4strain.INPUT_DIR = str(sys.argv[1])
-            psi4strain.OUTPUT_DIR = os.path.join(psi4strain.INPUT_DIR, "converted_strain")
-            EXT_RAD = float(sys.argv[2])
+            #bh_dir = str(sys.argv[1])
+            #psi4strain.INPUT_DIR = str(sys.argv[1])
+            #psi4strain.OUTPUT_DIR = os.path.join(psi4strain.INPUT_DIR, "converted_strain")
+            ext_rad = float(sys.argv[2])
             psi4strain.EXT_RAD = float(sys.argv[2])
         if ask_user(
             f"Save converted strain to {psi4strain.INPUT_DIR} ? (Y/N): "
         ):
             psi4strain.WRITE_FILES = True
+    else:
+        bh_dir = BH_DIR
+        movie_dir = MOVIE_DIR
+        ext_rad = EXT_RAD
 
     # File names
     bh_file_name = "puncture_posns_vels_regridxyzU.txt"
-    bh_file_path = os.path.join(BH_DIR, bh_file_name)
+    bh_file_path = os.path.join(bh_dir, bh_file_name)
 
-    movie_file_name = "first_real_movie"
-    movie_file_path = os.path.join(MOVIE_DIR, movie_file_name)
+    movie_dir_name = "real_movie2"
+    movie_file_path = os.path.join(movie_dir, movie_dir_name)
 
     if os.path.exists(movie_file_path):
         if ask_user(
@@ -364,7 +369,7 @@ def main() -> None:
             os.remove(os.path.join(movie_file_path, file))
     else:
         os.makedirs(movie_file_path)
-
+    time1 = time.time()
     # Mathematical parameters
     n_rad_pts = 450
     n_azi_pts = 180
@@ -384,7 +389,7 @@ def main() -> None:
     bh1_mass = 1
     bh2_mass = 1.24
     bh_scaling_factor = 1
-
+    time2 = time.time()
     # ---Preliminary Calculations---
     if STATUS_MESSAGES:
         print(
@@ -394,13 +399,13 @@ def main() -> None:
     strain_array, grid, points = initialize_tvtk_grid(n_azi_pts, n_rad_pts)
     width = 0.5 * omitted_radius_length
     dropoff_radius = width + omitted_radius_length
-    
+    time3=time.time()
     if STATUS_MESSAGES:
         print(
             """**********************************************************************
     Converting psi4 data to strain..."""
         )
-    
+
     # Import strain data
     time_array, mode_data = psi4strain.psi4_ffi_to_strain()
     n_times = len(time_array)
@@ -413,7 +418,7 @@ def main() -> None:
     rv, az = np.meshgrid(radius_values, azimuth_values, indexing="ij")
     x_values = rv * np.cos(az)
     y_values = rv * np.sin(az)
-
+    time4=time.time()
     if STATUS_MESSAGES:
         print(
             """**********************************************************************
@@ -422,7 +427,7 @@ def main() -> None:
 
     # Apply spin-weighted spherical harmonics, superimpose modes, and interpolate to mesh points
     strain_azi = swsh_summation_angles(colat, azimuth_values, mode_data).real
-    lerp_times = generate_interpolation_points(time_array, radius_values)
+    lerp_times = generate_interpolation_points(time_array, radius_values, ext_rad)
 
     strain_to_mesh = np.zeros((n_rad_pts, n_azi_pts, n_times))
     for i in range(n_azi_pts):
@@ -434,7 +439,7 @@ def main() -> None:
             """**********************************************************************
     Calculating black hole trajectories..."""
         )
-
+    time5=time.time()
     # Import black hole data
     if bh1_mass > bh2_mass:  # then swap
         bh1_mass, bh2_mass = bh2_mass, bh1_mass
@@ -457,7 +462,7 @@ def main() -> None:
     bh2_x = -bh1_x * bh_mass_ratio
     bh2_y = -bh1_y * bh_mass_ratio
     bh2_z = -bh1_z * bh_mass_ratio
-
+    time6=time.time()
     if STATUS_MESSAGES:
         print(
             """**********************************************************************
@@ -470,8 +475,8 @@ def main() -> None:
     engine.start()
     # engine.new_scene()
     # engine.scenes[0].scene.jpeg_quality = 100
+    # mlab.options.offscreen = True
     mlab.figure(engine=engine, size=resolution)
-    #strain_array, grid, points = initialize_tvtk_grid(n_azi_pts, n_rad_pts)
 
     create_gw(engine, grid, gw_color)
     if wireframe:
@@ -484,8 +489,9 @@ def main() -> None:
 
     start_time = time.time()
     percentage = list(np.round(np.linspace(0, n_times, 100)).astype(int))
-
-    @mlab.animate()  # ui=False) This doesn't work for some reason?
+    time6=time.time()
+    print(f"0:{time1-time0}\n1:{time2-time1}\n2:{time3-time2}\n3:{time4-time3}\n4:{time5-time4}\n5:{time6-time5}\na:{time6-time0}\n")
+    @mlab.animate(delay=10,ui=False)  # ui=False) This doesn't work for some reason?
     def anim():
         for time_idx in range(n_times):
             if time_idx % save_rate != 0:
@@ -555,11 +561,10 @@ def main() -> None:
                     f"in {dhms_time(total_time)}.",
                 )
                 print("Creating movie...")
-                convert_to_movie(movie_file_path, movie_file_name, frames_per_second)
-                print(f"Movie saved to {movie_file_path}/{movie_file_name}.mp4")
+                convert_to_movie(movie_file_path, movie_dir_name, frames_per_second)
+                print(f"Movie saved to {movie_file_path}/{movie_dir_name}.mp4")
                 exit()
             yield
-
     _ = anim()
     mlab.show()
 
