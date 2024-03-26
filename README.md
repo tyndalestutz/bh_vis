@@ -17,5 +17,6 @@ Python -m venv .venv
 .venv/scripts/Activate.ps1
 pip install -U numpy "vtk<9.4" pillow pytest traitsui PyQt5 
 pip install -U git+https://github.com/enthought/mayavi.git
+
 ```
  (note that you must have a version of python installed and added to PATH):
