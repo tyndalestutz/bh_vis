@@ -1,10 +1,6 @@
-.vscode
 .venv
-new
-r100
+.vscode
+data/movies/*
+data/*_strain
 scripts/__pycache__
-visit/r100
-visit/output
-visit/dataout
-psi4Strain
-movies
+

@@ -1,3 +1,18 @@
+"""
+This module processes gravitational wave data from numerical relativity simulations.
+
+The module reads a directory of ASCII files of various ell values of waveform data, computes phase and amplitude data,
+calculates a minimum data frequency using a quadratic fit of the monotonic phase of  ell2 m2 data,
+and uses a Fast Fourier Transform to compute the second time integral of the waveform, (the strain).
+The module computes a second derivative of the result to check against the original data.
+
+The phase and amplitude, the second integral, and the twice integrated-twice differentiated data is saved to txt files.
+The primary function returns the second integral data as a numpy array with the various ell-values.
+
+Author: Zachariah B. Etienne
+        zachetie **at** gmail **dot* com
+"""
+
 import sys
 import os
 from typing import List, Tuple
@@ -5,16 +20,17 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import curve_fit
 
-OUTPUT_DIR = "psi4Strain"
-INPUT_DIR = "r100"
+
+INPUT_DIR = "../BH_VIS/data/r100" # changeable in animation_main.py
+OUTPUT_DIR = "../BH_VIS/data/r100_strain"
 FILE_PATTERN = "_l[MODE=L]-"
 ELL_MIN = 2
 ELL_MAX = 8
-EXT_RAD = 100
+EXT_RAD = 100 # changeable in animation_main.py
 INTERVAL = 200
 CUTTOFF_FACTOR = 0.75
-STATUS_MESSAGES = False
-WRITE_FILES = False
+STATUS_MESSAGES = True
+WRITE_FILES = True # changeable in animation_main.py
 
 
 def read_psi4_dir() -> tuple[np.ndarray, np.ndarray]:
