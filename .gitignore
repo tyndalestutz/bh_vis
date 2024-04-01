@@ -1,6 +1,6 @@
 .venv
 .vscode
-data/movies/*
-data/*_strain
+**/movies/
+**/*_strain
 scripts/__pycache__
 
