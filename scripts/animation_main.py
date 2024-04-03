@@ -27,13 +27,13 @@ from mayavi.modules.surface import Surface
 import psi4_FFI_to_strain as psi4strain
 
 
-BH_DIR = "../BH_VIS/data/puncture" # changeable with sys arguments
-MOVIE_DIR = "../BH_VIS/data/Movies" # changeable with sys arguments
+BH_DIR = "../bh_vis/data/GW150914_data/puncture" # changeable with sys arguments
+MOVIE_DIR = "../bh_vis/data/GW150914_data/movies" # changeable with sys arguments
 ELL_MAX = 8
 ELL_MIN = 2
 S_MODE = -2
 EXT_RAD = 100 # changeable with sys arguments
-USE_SYS_ARGS = False
+USE_SYS_ARGS = True
 STATUS_MESSAGES = True
 
 def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
@@ -331,18 +331,26 @@ def main() -> None:
     # Check initial parameters
     time0 = time.time()
     if USE_SYS_ARGS:
-        if len(sys.argv) != 3:
+        if len(sys.argv) != 5:
             raise RuntimeError(
                 """Please include path to merger data as well as the psi4 extraction radius of that data.
-                Usage: python3 animation_main.py <path to data folder> <extraction radius (r/M) (4 digits, e.g. 0100)>"""
+                Usage (spaces between arguments): python3 
+                                                  animation_main.py 
+                                                  <path to data folder> 
+                                                  <extraction radius (r/M) (4 digits, e.g. 0100)>
+                                                  <mass of one black hole>
+                                                  <mass of other black hole>"""
             )
         else:
             # change directories and extraction radius based on inputs
-            #bh_dir = str(sys.argv[1])
-            #psi4strain.INPUT_DIR = str(sys.argv[1])
-            #psi4strain.OUTPUT_DIR = os.path.join(psi4strain.INPUT_DIR, "converted_strain")
+            bh_dir = str(sys.argv[1])
+            psi4strain.INPUT_DIR = str(sys.argv[1])
+            psi4strain.OUTPUT_DIR = os.path.join(psi4strain.INPUT_DIR, "converted_strain")
             ext_rad = float(sys.argv[2])
             psi4strain.EXT_RAD = float(sys.argv[2])
+            bh1_mass = float(sys.argv[3])
+            bh2_mass = float(sys.argv[4])
+            movie_dir = os.path.join(str(sys.argv[1]), "movies")
         if ask_user(
             f"Save converted strain to {psi4strain.INPUT_DIR} ? (Y/N): "
         ):
@@ -351,6 +359,10 @@ def main() -> None:
         bh_dir = BH_DIR
         movie_dir = MOVIE_DIR
         ext_rad = EXT_RAD
+
+        # mass ratio for default system GW150914
+        bh1_mass = 1
+        bh2_mass = 1.24
 
     # File names
     bh_file_name = "puncture_posns_vels_regridxyzU.txt"
@@ -386,9 +398,6 @@ def main() -> None:
     resolution = (1920, 1080)
     gw_color = (0.28, 0.46, 1.0)
     bh_color = (0.1, 0.1, 0.1)
-    bh1_mass = 1
-    bh2_mass = 1.24
-    bh_scaling_factor = 1
     time2 = time.time()
     # ---Preliminary Calculations---
     if STATUS_MESSAGES:
@@ -481,6 +490,7 @@ def main() -> None:
     create_gw(engine, grid, gw_color)
     if wireframe:
         create_gw(engine, grid, gw_color, wireframe=True)
+    bh_scaling_factor = 1
     bh1 = create_sphere(engine, bh1_mass * bh_scaling_factor, bh_color)
     bh2 = create_sphere(engine, bh2_mass * bh_scaling_factor, bh_color)
     mlab.view(

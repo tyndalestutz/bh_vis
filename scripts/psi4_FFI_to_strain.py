@@ -21,8 +21,8 @@ from numpy.typing import NDArray
 from scipy.optimize import curve_fit
 
 
-INPUT_DIR = "../BH_VIS/data/r100" # changeable in animation_main.py
-OUTPUT_DIR = "../BH_VIS/data/r100_strain"
+INPUT_DIR = "../bh_vis/data/GW150914_data/r100" # changeable in animation_main.py
+OUTPUT_DIR = "../bh_vis/data/GW150914_data/r100_strain"
 FILE_PATTERN = "_l[MODE=L]-"
 ELL_MIN = 2
 ELL_MAX = 8
@@ -94,7 +94,7 @@ def psi4_ffi_to_strain():
         time_arr, psi4_modes_data[get_index_from_modes(2, 2)]
     )
     freq_cutoff = CUTTOFF_FACTOR * min_omega_l2m2
-
+    
     # Initialize arrays for strain modes and their second time derivatives
     strain_modes = np.zeros_like(psi4_modes_data)
     strain_modes_ddot = np.zeros_like(psi4_modes_data)
