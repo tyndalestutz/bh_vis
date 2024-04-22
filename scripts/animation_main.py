@@ -33,7 +33,7 @@ ELL_MAX = 8
 ELL_MIN = 2
 S_MODE = -2
 EXT_RAD = 100 # changeable with sys arguments
-USE_SYS_ARGS = True
+USE_SYS_ARGS = False
 STATUS_MESSAGES = True
 
 def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
@@ -45,6 +45,15 @@ def swsh_summation_angles(colat: float, azi: NDArray[np.float64], mode_data):
     :param azi: azimuthal angle for the SWSH factor
     :param mode_data: numpy array containing strain data for all the modes
     :return: a complex valued numpy array of the superimposed wave
+
+    >>> mode_data = np.zeros((77, 3), dtype=complex)
+    >>> mode_idx = 0
+    >>> for l in range(2, 9):
+    ...     for m in range(-l, l+1):
+    ...         mode_data[mode_idx] = np.array([1+1j, 2+3j, 4+5j])
+    ...         mode_idx += 1
+    >>> np.round(swsh_summation_angles(np.pi/2, np.array([0]), mode_data), 5)
+    array([[ 4.69306 +4.69306j,  9.38612+14.07918j, 18.77224+23.4653j ]])
     """
     quat_arr = quaternionic.array.from_spherical_coordinates(colat, azi)
     winger = spherical.Wigner(ELL_MAX, ELL_MIN)
