@@ -20,26 +20,12 @@ Whether you have your own data or you'd like to tinker with our sample data, sim
 
 To use these scripts with your own data, take a look at [this brief explanation](jupyter_notebooks/Tutorial-Compatible_Data_Formats.ipynb) of compatible data formats, along with instructions to prepare your data.
 
-### Windows 11 installation
-1. In the directory where you would like the repository, open terminal and run this codeblock. Alternatively run each line individually as needed.
-```py
-git clone https://github.com/tyndalestutz/bh_vis.git
-cd bh_vis
-Python -m venv .venv
-.venv/scripts/Activate.ps1
-pip install -U numpy "vtk<9.4" pillow pytest traitsui PyQt5 
-pip install -U git+https://github.com/enthought/mayavi.git
-
-```
- (note that you must have a version of python installed and added to PATH):
-
 ## Resources
 
-If you haven't already, check out [(bh@h link here)]() to volunteer some of your processing power for the simulation of black hole collisions! And in the meantime, further data to be visualized can be found from the following sources:
+If you haven't already, check out [(bh@h)](https://blackholesathome.net/blackholesathome_homepage-en_US.html) to volunteer some of your processing power for the simulation of black hole collisions! And in the meantime, further data to be visualized can be found from the following sources:
 
-1. Zenodo GW###
-2. SXS Collaboration
-3. Third Source
+1. [(Zenodo GW150914)](https://zenodo.org/records/155394)
+2. [(SXS Collaboration)](https://data.black-holes.org/waveforms/index.html)
 ## Contributing
 
 Pull requests are welcome! If you'd like to add or fix anything, follow these steps:
