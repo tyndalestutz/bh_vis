@@ -28,8 +28,8 @@ from mayavi.modules.scalar_cut_plane import ScalarCutPlane
 import psi4_FFI_to_strain as psi4strain
 
 
-BH_DIR = "../bh_vis/data/GW150914_data/r100" # changeable with sys arguments
-MOVIE_DIR = "../bh_vis/data/GW150914_data/movies" # changeable with sys arguments
+BH_DIR = "../data/GW150914_data/r100" # changeable with sys arguments
+MOVIE_DIR = "../data/GW150914_data/movies" # changeable with sys arguments
 ELL_MAX = 8
 ELL_MIN = 2
 S_MODE = -2
