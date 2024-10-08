@@ -1,6 +1,8 @@
 .venv
 .vscode
 **/movies/
-**/*_strain
+**/*_strain.txt
+**/*_omega.txt
+**/bh_synthetic.csv
 scripts/__pycache__
 

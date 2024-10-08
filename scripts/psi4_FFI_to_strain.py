@@ -17,53 +17,11 @@ Author: Zachariah B. Etienne
 """
 
 import sys
-import os
+import os #diabolical
 from typing import Union, List, Tuple
 import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import curve_fit
-
-# if data file naming conventions change then
-# adjust the find_file_for_l pattern for inputs
-# and the psi4_ffi_to_strain for outputs
-
-
-def read_psi4_dir(
-    data_dir: str, ell_max: int, ell_min: int = 2
-) -> tuple[NDArray[np.float64], NDArray[np.complex128]]:
-    """
-    Read data from psi4 output directory and return time and mode data.
-
-    :return: tuple[np.ndarray, np.ndarray]
-        - time_data: Array of numpy.float64 time values (shape: (n_times,) ).
-        - mode_data: 2D Array for modes of numpy.complex128 data (shape: (2*l+1, n_times,) ).
-    """
-    time_data: NDArray[np.float64]
-    psi4_modes_data: list[NDArray[np.complex128]] = []
-
-    n_times = -1
-    for ell in range(ell_min, ell_max + 1):
-        filepath = find_file_for_l(data_dir, ell)
-        with open(filepath, "r", encoding="utf-8") as file:
-            lines = [line for line in file.readlines() if not line.startswith("#")]
-        data = np.array([np.array(line.split(), dtype=np.float64) for line in lines])
-
-        # np.unique sorts by time, removing duplicates
-        time_data, indicies = np.unique(data[:, 0], return_index=True)
-        data = data[indicies]  # sort data accordningly
-
-        if n_times == -1:
-            n_times = len(time_data)
-        if n_times != len(time_data):
-            raise ValueError(
-                f"Inconsistent times for l={ell}. Expected {n_times}, got {len(time_data)}."
-            )
-
-        real_idx = 1
-        for _ in range(2 * ell + 1):
-            psi4_modes_data.append(data[:, real_idx] + 1j * data[:, real_idx + 1])
-            real_idx += 2
-    return np.array(time_data), np.array(psi4_modes_data)
 
 
 def psi4_ffi_to_strain(
@@ -177,6 +135,49 @@ def psi4_ffi_to_strain(
             arrays_to_txt(labels, ddot_cols, ddot_filename, output_dir)
 
     return time_arr, strain_modes
+
+
+'''
+if data file naming conventions change then
+adjust the find_file_for_l pattern for inputs
+and the psi4_ffi_to_strain for outputs
+'''
+def read_psi4_dir(
+    data_dir: str, ell_max: int, ell_min: int = 2
+) -> tuple[NDArray[np.float64], NDArray[np.complex128]]:
+    """
+    Read data from psi4 output directory and return time and mode data.
+
+    :return: tuple[np.ndarray, np.ndarray]
+        - time_data: Array of numpy.float64 time values (shape: (n_times,) ).
+        - mode_data: 2D Array for modes of numpy.complex128 data (shape: (2*l+1, n_times,) ).
+    """
+    time_data: NDArray[np.float64]
+    psi4_modes_data: list[NDArray[np.complex128]] = []
+
+    n_times = -1
+    for ell in range(ell_min, ell_max + 1):
+        filepath = find_file_for_l(data_dir, ell)
+        with open(filepath, "r", encoding="utf-8") as file:
+            lines = [line for line in file.readlines() if not line.startswith("#")]
+        data = np.array([np.array(line.split(), dtype=np.float64) for line in lines])
+
+        # np.unique sorts by time, removing duplicates
+        time_data, indicies = np.unique(data[:, 0], return_index=True)
+        data = data[indicies]  # sort data accordningly
+
+        if n_times == -1:
+            n_times = len(time_data)
+        if n_times != len(time_data):
+            raise ValueError(
+                f"Inconsistent times for l={ell}. Expected {n_times}, got {len(time_data)}."
+            )
+
+        real_idx = 1
+        for _ in range(2 * ell + 1):
+            psi4_modes_data.append(data[:, real_idx] + 1j * data[:, real_idx + 1])
+            real_idx += 2
+    return np.array(time_data), np.array(psi4_modes_data)
 
 
 def find_file_for_l(data_dir: str, ell: int) -> str:
