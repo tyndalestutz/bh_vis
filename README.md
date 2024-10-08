@@ -18,6 +18,16 @@ The BH@H Visualization Toolkit provides a foundation for visualizing simulation 
 
 Whether you have your own data or you'd like to tinker with our sample data, simply clone this repository into a new folder and navigate to [the comprehensive step-by-step guide](jupyter_notebooks/Tutorial-Start_to_Finish-Psi4_to_mp4.ipynb) to create your first movie!
 
+If you'd like to skip straight to usage, run the following lines to get started.
+
+```
+git clone https://github.com/tyndalestutz/bh_vis.git
+cd bh_vis
+Python -m venv .venv
+.venv/scripts/Activate.ps1
+pip install -r requirements.txt
+```
+
 To use these scripts with your own data, take a look at [this brief explanation](jupyter_notebooks/Tutorial-Compatible_Data_Formats.ipynb) of compatible data formats, along with instructions to prepare your data.
 
 ## Resources
